@@ -6,8 +6,10 @@ import {
   createInitialAppState,
   hasCompletedWorkout,
   saveActiveWorkoutSession,
+  saveWorkoutPlan,
   upsertExerciseWeight,
 } from './appState';
+import { createDefaultWorkoutPlan } from './workoutPlan';
 
 describe('app state', () => {
   it('starts with empty histories', () => {
@@ -18,6 +20,7 @@ describe('app state', () => {
       activeWorkoutSession: null,
       exerciseWeights: {},
       stepSamples: [],
+      workoutPlan: createDefaultWorkoutPlan(),
     });
   });
 
@@ -102,6 +105,15 @@ describe('app state', () => {
 
     expect(saved.activeWorkoutSession).toBe(session);
     expect(clearActiveWorkoutSession(saved).activeWorkoutSession).toBeNull();
+  });
+
+  it('saves the editable workout plan', () => {
+    const plan = {
+      ...createDefaultWorkoutPlan(),
+      name: 'upper day',
+    };
+
+    expect(saveWorkoutPlan(createInitialAppState(), plan).workoutPlan).toEqual(plan);
   });
 
   it('keeps the latest known weight per exercise', () => {

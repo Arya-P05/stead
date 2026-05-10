@@ -1,3 +1,7 @@
+import type { WorkoutSession } from '../domain/workoutSession';
+import type { WorkoutPlan } from '../domain/workoutSession';
+import { createDefaultWorkoutPlan } from './workoutPlan';
+
 export type DailyOutcome = {
   date: string;
   completedItems: number;
@@ -44,6 +48,7 @@ export type AppState = {
   activeWorkoutSession: WorkoutSession | null;
   exerciseWeights: Record<string, ExerciseWeight>;
   stepSamples: StepSample[];
+  workoutPlan: WorkoutPlan;
 };
 
 export function createInitialAppState(): AppState {
@@ -54,6 +59,7 @@ export function createInitialAppState(): AppState {
     activeWorkoutSession: null,
     exerciseWeights: {},
     stepSamples: [],
+    workoutPlan: createDefaultWorkoutPlan(),
   };
 }
 
@@ -98,6 +104,13 @@ export function clearActiveWorkoutSession(state: AppState): AppState {
   };
 }
 
+export function saveWorkoutPlan(state: AppState, workoutPlan: WorkoutPlan): AppState {
+  return {
+    ...state,
+    workoutPlan,
+  };
+}
+
 export function upsertExerciseWeight(state: AppState, weight: ExerciseWeight): AppState {
   const current = state.exerciseWeights[weight.exerciseId];
 
@@ -123,4 +136,3 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
     ].sort((a, b) => b.capturedAt - a.capturedAt),
   };
 }
-import type { WorkoutSession } from '../domain/workoutSession';
