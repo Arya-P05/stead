@@ -38,6 +38,21 @@ describe('storage', () => {
     await expect(loadAppState(storage)).resolves.toEqual(createInitialAppState());
   });
 
+  it('hydrates older v1 saves with the current defaults', async () => {
+    const storage = createMemoryStorage({
+      'stead.app-state': JSON.stringify({
+        version: 1,
+        dailyOutcomes: [],
+        workoutOutcomes: [],
+        activeWorkoutSession: null,
+        exerciseWeights: {},
+        stepSamples: [],
+      }),
+    });
+
+    await expect(loadAppState(storage)).resolves.toEqual(createInitialAppState());
+  });
+
   it('saves and reloads app state', async () => {
     const storage = createMemoryStorage();
     const state = {

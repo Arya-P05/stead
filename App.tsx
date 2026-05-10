@@ -740,7 +740,7 @@ function Home() {
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(createDefaultWorkoutPlan(), Date.now()),
   );
-  const workoutPlan = appState.workoutPlan;
+  const workoutPlan = appState.workoutPlan ?? createDefaultWorkoutPlan();
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
@@ -889,7 +889,12 @@ function Home() {
     exerciseId: string,
     patch: Parameters<typeof updateExercise>[2],
   ) => {
-    setAppState((state) => saveWorkoutPlan(state, updateExercise(state.workoutPlan, exerciseId, patch)));
+    setAppState((state) =>
+      saveWorkoutPlan(
+        state,
+        updateExercise(state.workoutPlan ?? createDefaultWorkoutPlan(), exerciseId, patch),
+      ),
+    );
   };
 
   return (
