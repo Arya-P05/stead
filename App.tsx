@@ -270,7 +270,7 @@ function DaySurface({
       </View>
 
       <View style={styles.bottomActions}>
-        <ActionText onPress={onBack}>home</ActionText>
+        <ActionText onPress={onBack}>back</ActionText>
         <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
       </View>
     </View>
@@ -587,12 +587,12 @@ function WorkoutSurface({
           <View style={styles.bottomActions}>
             {mode === 'voice' ? (
               <>
-                <ActionText onPress={() => setMode('exercise')}>cancel</ActionText>
+                <ActionText onPress={() => setMode('exercise')}>back</ActionText>
                 <ActionText onPress={onLogSet}>log</ActionText>
               </>
             ) : isResting ? (
               <>
-                <ActionText onPress={() => setMode('overview')}>list</ActionText>
+                <ActionText onPress={() => setMode('overview')}>back</ActionText>
                 <ActionText onPress={onSkipRest}>skip</ActionText>
                 <ActionText onPress={onAddRest}>+30s</ActionText>
               </>
@@ -602,7 +602,7 @@ function WorkoutSurface({
               </>
             ) : (
               <>
-                <ActionText onPress={() => setMode('overview')}>list</ActionText>
+                <ActionText onPress={() => setMode('overview')}>back</ActionText>
                 <ActionText onPress={() => setMode('voice')}>voice</ActionText>
                 <ActionText onPress={onLogSet}>log set</ActionText>
               </>
