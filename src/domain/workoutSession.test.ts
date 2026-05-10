@@ -1,7 +1,9 @@
 import {
+  addRestTime,
   completeSet,
   getActiveExercise,
   getRestRemainingSeconds,
+  skipRest,
   startWorkoutSession,
 } from './workoutSession';
 import type { WorkoutPlan } from './workoutSession';
@@ -100,6 +102,34 @@ describe('workout session', () => {
     const session = startWorkoutSession(plan, 1000);
 
     expect(getRestRemainingSeconds(session, 1200)).toBe(0);
+  });
+
+  it('skips active rest', () => {
+    const session = completeSet(startWorkoutSession(plan, 1000), plan, 1200);
+
+    expect(skipRest(session).restEndsAt).toBeNull();
+  });
+
+  it('leaves completed sessions unchanged when skipping rest', () => {
+    const first = completeSet(startWorkoutSession(plan, 1000), plan, 1200);
+    const second = completeSet(first, plan, 92000);
+    const third = completeSet(second, plan, 183000);
+    const fourth = completeSet(third, plan, 184000);
+    const done = completeSet(fourth, plan, 260000);
+
+    expect(skipRest(done)).toBe(done);
+  });
+
+  it('adds rest time to an active rest window', () => {
+    const session = completeSet(startWorkoutSession(plan, 1000), plan, 1200);
+
+    expect(addRestTime(session, 30).restEndsAt).toBe(121200);
+  });
+
+  it('does not add rest time when rest is inactive', () => {
+    const session = startWorkoutSession(plan, 1000);
+
+    expect(addRestTime(session, 30)).toBe(session);
   });
 
   it('throws when a plan has no exercises', () => {

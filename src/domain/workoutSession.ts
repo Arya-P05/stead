@@ -3,6 +3,8 @@ export type WorkoutExercise = {
   name: string;
   targetSets: number;
   restSeconds: number;
+  targetReps?: number;
+  weightLb?: number;
 };
 
 export type WorkoutPlan = {
@@ -94,4 +96,26 @@ export function getRestRemainingSeconds(session: WorkoutSession, now: number) {
   }
 
   return Math.max(0, Math.ceil((session.restEndsAt - now) / 1000));
+}
+
+export function skipRest(session: WorkoutSession): WorkoutSession {
+  if (session.completedAt !== null || session.restEndsAt === null) {
+    return session;
+  }
+
+  return {
+    ...session,
+    restEndsAt: null,
+  };
+}
+
+export function addRestTime(session: WorkoutSession, seconds: number): WorkoutSession {
+  if (session.completedAt !== null || session.restEndsAt === null) {
+    return session;
+  }
+
+  return {
+    ...session,
+    restEndsAt: session.restEndsAt + seconds * 1000,
+  };
 }
