@@ -14,6 +14,14 @@ stead is a quiet iOS command surface for personal momentum. It should feel calm,
   - Success: soft green (`#9fe6b4`).
   - Warning/failure: soft amber (`#f2c675`).
 
+## brand assets
+
+- Source brand files live in `assets/brand`.
+- App icon, splash icon, adaptive icon, and favicon use the dark stead mark.
+- Raster app assets are exported from `assets/brand/icon-app-export.svg`.
+- Keep in-app surfaces text-first. Use the full wordmark only when it has enough clear space; use the monogram below the brand kit minimum size.
+- Do not add the animated pulse mark inside native surfaces unless the same timing is rebuilt natively.
+
 ## opacity scale
 
 - Title: `0.92`.
