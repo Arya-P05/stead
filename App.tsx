@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
@@ -12,21 +12,61 @@ import {
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors, opacity, spacing, typography } from './src/designSystem';
+import { chooseRecommendation } from './src/domain/recommendations';
+import { completeSet, startWorkoutSession } from './src/domain/workoutSession';
+import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
+import { getWorkoutStatus } from './src/domain/workoutStatus';
 
 const today = {
   steps: 6420,
   stepGoal: 10000,
   focusMinutes: 154,
-  next: 'take a 10 min walk',
-  reason: 'sunny window before calls',
   workout: 'upper push',
+  minutesUntilNextEvent: 90,
+  weather: {
+    condition: 'sunny' as const,
+    temperatureF: 72,
+    precipitationChance: 0.05,
+  },
 };
 
-const workoutPlan = [
-  { index: '01', name: 'incline dumbbell press', work: '3 sets · 40s', rest: '90s' },
-  { index: '02', name: 'shoulder press', work: '3 sets · 10 reps', rest: '90s' },
-  { index: '03', name: 'cable fly', work: '3 sets · 12 reps', rest: '60s' },
-];
+const workoutPlan: WorkoutPlan = {
+  id: 'upper-push',
+  name: 'upper push',
+  exercises: [
+    {
+      id: 'incline-db-press',
+      name: 'incline dumbbell press',
+      targetSets: 3,
+      restSeconds: 90,
+    },
+    {
+      id: 'shoulder-press',
+      name: 'shoulder press',
+      targetSets: 3,
+      restSeconds: 90,
+    },
+    {
+      id: 'cable-fly',
+      name: 'cable fly',
+      targetSets: 3,
+      restSeconds: 60,
+    },
+  ],
+};
+
+const recommendation = chooseRecommendation({
+  steps: today.steps,
+  stepGoal: today.stepGoal,
+  minutesWorked: today.focusMinutes,
+  minutesUntilNextEvent: today.minutesUntilNextEvent,
+  weather: today.weather,
+  workout: {
+    planned: true,
+    completed: false,
+    name: today.workout,
+  },
+});
 
 type FeedbackState = 'idle' | 'success' | 'warning';
 
@@ -105,30 +145,60 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   );
 }
 
-function WorkoutSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function WorkoutSheet({
+  session,
+  visible,
+  onClose,
+  onLogSet,
+}: {
+  session: WorkoutSession;
+  visible: boolean;
+  onClose: () => void;
+  onLogSet: () => void;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const status = getWorkoutStatus(workoutPlan, session, now);
+
+  useEffect(() => {
+    if (!visible) {
+      return undefined;
+    }
+
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+
+    return () => clearInterval(timer);
+  }, [visible]);
+
   return (
     <Modal animationType="slide" visible={visible} presentationStyle="pageSheet">
       <SafeAreaView style={styles.sheet}>
         <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>upper push</Text>
-          <Text style={styles.sheetMeta}>next up · incline dumbbell press</Text>
+          <Text style={styles.sheetTitle}>{status.title}</Text>
+          <Text style={styles.sheetMeta}>{status.meta}</Text>
 
           <View style={styles.exerciseList}>
-            {workoutPlan.map((exercise) => (
-              <View key={exercise.index} style={styles.exerciseRow}>
-                <Text style={styles.indexLabel}>{exercise.index}</Text>
-                <View style={styles.exerciseCopy}>
-                  <Text style={styles.exerciseName}>{exercise.name}</Text>
-                  <Text style={styles.metadata}>
-                    {exercise.work} · rest {exercise.rest}
-                  </Text>
+            {workoutPlan.exercises.map((exercise, index) => {
+              const completedSets = session.sets.filter(
+                (set) => set.exerciseId === exercise.id,
+              ).length;
+
+              return (
+                <View key={exercise.id} style={styles.exerciseRow}>
+                  <Text style={styles.indexLabel}>{String(index + 1).padStart(2, '0')}</Text>
+                  <View style={styles.exerciseCopy}>
+                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    <Text style={styles.metadata}>
+                      {completedSets}/{exercise.targetSets} sets · rest {exercise.restSeconds}s
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           <View style={styles.sheetActions}>
-            <ActionText onPress={() => undefined}>start timer</ActionText>
+            <ActionText onPress={status.isComplete ? onClose : onLogSet}>{status.action}</ActionText>
             <Text style={styles.dot}>·</Text>
             <ActionText onPress={onClose}>done</ActionText>
           </View>
@@ -140,7 +210,13 @@ function WorkoutSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 
 function Home() {
   const [workoutVisible, setWorkoutVisible] = useState(false);
+  const [workoutSession, setWorkoutSession] = useState(() =>
+    startWorkoutSession(workoutPlan, Date.now()),
+  );
   const stepProgress = Math.min(today.steps / today.stepGoal, 1);
+  const logWorkoutSet = () => {
+    setWorkoutSession((session) => completeSet(session, workoutPlan, Date.now()));
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -153,8 +229,8 @@ function Home() {
 
         <View style={styles.recommendation}>
           <Text style={styles.indexLabel}>next</Text>
-          <Text style={styles.nextAction}>{today.next}</Text>
-          <Text style={styles.supporting}>{today.reason}</Text>
+          <Text style={styles.nextAction}>{recommendation.action}</Text>
+          <Text style={styles.supporting}>{recommendation.reason}</Text>
         </View>
 
         <View style={styles.actions}>
@@ -183,7 +259,12 @@ function Home() {
         </View>
       </View>
 
-      <WorkoutSheet visible={workoutVisible} onClose={() => setWorkoutVisible(false)} />
+      <WorkoutSheet
+        session={workoutSession}
+        visible={workoutVisible}
+        onClose={() => setWorkoutVisible(false)}
+        onLogSet={logWorkoutSet}
+      />
     </SafeAreaView>
   );
 }
