@@ -241,7 +241,7 @@ function DaySurface({
   const isToday = selectedDate === today.date;
 
   return (
-    <View style={styles.content}>
+    <View style={styles.calendarContent}>
       <View style={styles.dayHeader}>
         <View>
           <Text style={styles.titleText}>{isToday ? today.dateLabel : selectedDate.slice(5)}</Text>
@@ -722,6 +722,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: 54,
   },
+  calendarContent: {
+    flex: 1,
+    paddingBottom: 34,
+    paddingHorizontal: spacing.screenX,
+    paddingTop: 54,
+  },
   liveContent: {
     flex: 1,
     paddingBottom: 34,
@@ -849,9 +855,9 @@ const styles = StyleSheet.create({
   },
   calendarSurface: {
     alignSelf: 'center',
+    flex: 1,
     gap: 18,
     justifyContent: 'center',
-    paddingTop: 72,
     width: '100%',
   },
   weekdays: {
