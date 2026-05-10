@@ -43,10 +43,13 @@ export function PressableScale({
       ? { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const }
       : {};
 
+  const outerStyle = layout === 'fill' ? style : undefined;
+  const innerStyle = layout === 'fill' ? innerBase : style;
+
   return (
     <Pressable
       {...rest}
-      style={style}
+      style={outerStyle}
       onPressIn={(e) => {
         scale.value = withSpring(scaleTo, motionSpring);
         onPressIn?.(e);
@@ -56,7 +59,7 @@ export function PressableScale({
         onPressOut?.(e);
       }}
     >
-      <Animated.View style={[innerBase, animatedStyle]}>{children}</Animated.View>
+      <Animated.View style={[innerStyle, animatedStyle]}>{children}</Animated.View>
     </Pressable>
   );
 }
