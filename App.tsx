@@ -39,6 +39,7 @@ import { loadAppState, saveAppState } from './src/data/storage';
 import { createWorkoutOutcome } from './src/data/workoutOutcome';
 import { createCalendarMonth } from './src/data/calendarDays';
 import type { CalendarMonth } from './src/data/calendarDays';
+import { scheduleRecommendationNudge } from './src/services/notifications';
 
 const today = {
   date: '2026-05-09',
@@ -680,6 +681,19 @@ function Home() {
       saveAppState(undefined, appState);
     }
   }, [appState, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || recommendation.type === 'steady') {
+      return;
+    }
+
+    void scheduleRecommendationNudge(undefined, {
+      identifier: 'stead-next-action',
+      title: recommendation.action,
+      body: recommendation.reason,
+      secondsFromNow: 60 * 30,
+    });
+  }, [hydrated, recommendation.action, recommendation.reason, recommendation.type]);
 
   const logWorkoutSet = () => {
     setWorkoutSession((session) => {
