@@ -13,6 +13,8 @@ import {
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors, opacity, spacing, typeScale, typography } from './src/designSystem';
 import { chooseRecommendation } from './src/domain/recommendations';
+import { chooseHomeMiddle } from './src/domain/homeMiddle';
+import type { HomeMiddle } from './src/domain/homeMiddle';
 import {
   addRestTime,
   completeSet,
@@ -64,6 +66,12 @@ const dayItems: DayItem[] = [
   { title: 'focus', detail: 'in flow', time: 'now', active: true },
   { title: 'push day', detail: '47 min', time: '6:30', action: 'workout' },
   { title: 'read', detail: '30 min', time: '9:00' },
+];
+
+const remainingItems = [
+  { title: 'walk', time: 'now' },
+  { title: 'push day', time: '6:30' },
+  { title: 'read', time: '9:00' },
 ];
 
 const workoutPlan: WorkoutPlan = {
@@ -324,6 +332,57 @@ function CalendarSurface({
   );
 }
 
+function HomeMiddleSurface({
+  middle,
+  onWorkout,
+}: {
+  middle: HomeMiddle;
+  onWorkout: () => void;
+}) {
+  if (middle.type === 'moment') {
+    return (
+      <View style={styles.homeMiddle}>
+        <Text style={styles.homeMeta}>{middle.meta}</Text>
+        <Text style={styles.momentPhrase}>{middle.phrase}</Text>
+        <Text style={styles.momentAction}>{middle.action}</Text>
+      </View>
+    );
+  }
+
+  if (middle.type === 'next') {
+    return (
+      <View style={styles.homeMiddle}>
+        <Text style={styles.homeMeta}>{middle.label}</Text>
+        <Text style={styles.nextTitle}>{middle.title}</Text>
+        <Text style={styles.homeMeta}>{middle.meta}</Text>
+        <Pressable onPress={onWorkout} hitSlop={12}>
+          <Text style={styles.nextStart}>{middle.action}</Text>
+        </Pressable>
+        <Text style={styles.supporting}>{middle.detail}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.homeMiddle}>
+      <Text style={styles.homeMeta}>{middle.meta}</Text>
+      <View style={styles.todayThreeList}>
+        {middle.items.map((item, index) => (
+          <View key={`${item.title}-${item.time}`} style={styles.todayThreeRow}>
+            <Text style={styles.indexText}>{String(index + 1).padStart(2, '0')}</Text>
+            <Text style={[styles.todayThreeTitle, index > 0 && styles.untrackedText]}>
+              {item.title}
+            </Text>
+            <Text style={[styles.todayThreeTime, index > 0 && styles.untrackedText]}>
+              {item.time}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function FormatTimer({ seconds }: { seconds: number }) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
@@ -506,6 +565,11 @@ function Home() {
       name: today.workout,
     },
   });
+  const homeMiddle = chooseHomeMiddle({
+    minutesWorked: today.focusMinutes,
+    recommendation,
+    remainingItems,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -566,14 +630,10 @@ function Home() {
             </Pressable>
           </View>
 
-          <View style={styles.recommendation}>
-            <Text style={styles.nextAction}>{recommendation.action}</Text>
-            <Text style={styles.supporting}>{recommendation.reason}</Text>
-          </View>
-
-          <View style={styles.inlineActions}>
-            <ActionText onPress={() => setWorkoutVisible(true)}>workout</ActionText>
-          </View>
+          <HomeMiddleSurface
+            middle={homeMiddle}
+            onWorkout={() => setWorkoutVisible(true)}
+          />
 
           <View style={styles.progressBlock}>
             <View style={styles.progressHeader}>
@@ -654,37 +714,90 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: colors.foreground,
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '600',
     letterSpacing: 0,
     opacity: opacity.title,
   },
-  recommendation: {
+  homeMiddle: {
     flex: 1,
-    gap: 12,
     justifyContent: 'center',
+    paddingBottom: 34,
   },
-  nextAction: {
+  homeMeta: {
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+  },
+  momentPhrase: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    marginTop: 40,
+    opacity: opacity.body,
+  },
+  momentAction: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 26,
+    marginTop: 32,
+    opacity: opacity.enabled,
+  },
+  nextTitle: {
     color: colors.foreground,
     fontSize: 34,
     fontWeight: '600',
     letterSpacing: 0,
     lineHeight: 39,
+    marginTop: 28,
     opacity: opacity.title,
+  },
+  nextStart: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 26,
+    marginTop: 52,
+    opacity: opacity.enabled,
   },
   supporting: {
     color: colors.foreground,
     fontSize: typeScale.body,
     letterSpacing: 0,
     lineHeight: 24,
-    opacity: opacity.enabled,
+    marginTop: 18,
+    opacity: opacity.metadata,
   },
-  inlineActions: {
+  todayThreeList: {
+    gap: 22,
+    marginTop: 40,
+  },
+  todayThreeRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    paddingBottom: 44,
+  },
+  todayThreeTitle: {
+    color: colors.foreground,
+    flex: 1,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 26,
+    opacity: opacity.title,
+  },
+  todayThreeTime: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
   },
   dot: {
     color: colors.foreground,
@@ -693,7 +806,7 @@ const styles = StyleSheet.create({
   },
   progressBlock: {
     gap: 12,
-    paddingBottom: 34,
+    paddingBottom: 42,
   },
   progressHeader: {
     alignItems: 'center',
@@ -701,15 +814,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   progressTrack: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
-    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    height: 2,
     overflow: 'hidden',
   },
   progressFill: {
     backgroundColor: 'rgba(255,255,255,0.72)',
-    borderRadius: 999,
-    height: 3,
+    height: 2,
   },
   calendarSurface: {
     alignSelf: 'center',
