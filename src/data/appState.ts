@@ -41,6 +41,7 @@ export type AppState = {
   version: 1;
   dailyOutcomes: DailyOutcome[];
   workoutOutcomes: WorkoutOutcome[];
+  activeWorkoutSession: WorkoutSession | null;
   exerciseWeights: Record<string, ExerciseWeight>;
   stepSamples: StepSample[];
 };
@@ -50,6 +51,7 @@ export function createInitialAppState(): AppState {
     version: 1,
     dailyOutcomes: [],
     workoutOutcomes: [],
+    activeWorkoutSession: null,
     exerciseWeights: {},
     stepSamples: [],
   };
@@ -79,6 +81,23 @@ export function hasCompletedWorkout(state: AppState, planId: string) {
   return state.workoutOutcomes.some((outcome) => outcome.planId === planId);
 }
 
+export function saveActiveWorkoutSession(
+  state: AppState,
+  session: WorkoutSession,
+): AppState {
+  return {
+    ...state,
+    activeWorkoutSession: session,
+  };
+}
+
+export function clearActiveWorkoutSession(state: AppState): AppState {
+  return {
+    ...state,
+    activeWorkoutSession: null,
+  };
+}
+
 export function upsertExerciseWeight(state: AppState, weight: ExerciseWeight): AppState {
   const current = state.exerciseWeights[weight.exerciseId];
 
@@ -104,3 +123,4 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
     ].sort((a, b) => b.capturedAt - a.capturedAt),
   };
 }
+import type { WorkoutSession } from '../domain/workoutSession';

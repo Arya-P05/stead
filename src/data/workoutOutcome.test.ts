@@ -62,4 +62,16 @@ describe('createWorkoutOutcome', () => {
 
     expect(createWorkoutOutcome(plan, session, 5000).completedAt).toBe(5000);
   });
+
+  it('uses logged reps and weight when they differ from the plan', () => {
+    const session = completeSet(startWorkoutSession(plan, 1000), plan, 2000, {
+      reps: 8,
+      weightLb: 55,
+    });
+
+    expect(createWorkoutOutcome(plan, session).exercises[0]).toMatchObject({
+      reps: 8,
+      weightLb: 55,
+    });
+  });
 });

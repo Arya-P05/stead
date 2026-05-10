@@ -52,10 +52,24 @@ describe('workout session', () => {
         exerciseId: 'incline-db-press',
         completedAt: 1200,
         setNumber: 1,
+        reps: undefined,
+        weightLb: undefined,
       },
     ]);
     expect(session.restEndsAt).toBe(91200);
     expect(session.activeExerciseIndex).toBe(0);
+  });
+
+  it('stores actual reps and weight for a completed set', () => {
+    const session = completeSet(startWorkoutSession(plan, 1000), plan, 1200, {
+      reps: 8,
+      weightLb: 55,
+    });
+
+    expect(session.sets[0]).toMatchObject({
+      reps: 8,
+      weightLb: 55,
+    });
   });
 
   it('reports exercise progress for the overview', () => {

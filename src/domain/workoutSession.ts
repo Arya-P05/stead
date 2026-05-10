@@ -17,6 +17,8 @@ export type CompletedSet = {
   exerciseId: string;
   setNumber: number;
   completedAt: number;
+  reps?: number;
+  weightLb?: number;
 };
 
 export type WorkoutSession = {
@@ -96,6 +98,7 @@ export function completeSet(
   session: WorkoutSession,
   plan: WorkoutPlan,
   now: number,
+  setValues?: { reps?: number; weightLb?: number },
 ): WorkoutSession {
   if (session.completedAt !== null) {
     return session;
@@ -118,6 +121,8 @@ export function completeSet(
     exerciseId: activeExercise.id,
     completedAt: now,
     setNumber: completedSetsForExercise + 1,
+    reps: setValues?.reps ?? activeExercise.targetReps,
+    weightLb: setValues?.weightLb ?? activeExercise.weightLb,
   };
   const sets = [...session.sets, nextSet];
   const completedExercise = nextSet.setNumber >= activeExercise.targetSets;

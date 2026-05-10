@@ -2,8 +2,10 @@ import {
   addDailyOutcome,
   addStepSample,
   addWorkoutOutcome,
+  clearActiveWorkoutSession,
   createInitialAppState,
   hasCompletedWorkout,
+  saveActiveWorkoutSession,
   upsertExerciseWeight,
 } from './appState';
 
@@ -13,6 +15,7 @@ describe('app state', () => {
       version: 1,
       dailyOutcomes: [],
       workoutOutcomes: [],
+      activeWorkoutSession: null,
       exerciseWeights: {},
       stepSamples: [],
     });
@@ -84,6 +87,21 @@ describe('app state', () => {
 
     expect(hasCompletedWorkout(state, 'push-day')).toBe(true);
     expect(hasCompletedWorkout(state, 'pull-day')).toBe(false);
+  });
+
+  it('saves and clears an active workout session', () => {
+    const session = {
+      planId: 'push-day',
+      startedAt: 1000,
+      activeExerciseIndex: 0,
+      completedAt: null,
+      restEndsAt: null,
+      sets: [],
+    };
+    const saved = saveActiveWorkoutSession(createInitialAppState(), session);
+
+    expect(saved.activeWorkoutSession).toBe(session);
+    expect(clearActiveWorkoutSession(saved).activeWorkoutSession).toBeNull();
   });
 
   it('keeps the latest known weight per exercise', () => {

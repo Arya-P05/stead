@@ -14,13 +14,18 @@ export function createWorkoutOutcome(
     completedAt: session.completedAt ?? now,
     totalSets: session.sets.length,
     exercises: plan.exercises
-      .map((exercise) => ({
-        exerciseId: exercise.id,
-        name: exercise.name,
-        sets: session.sets.filter((set) => set.exerciseId === exercise.id).length,
-        reps: exercise.targetReps,
-        weightLb: exercise.weightLb,
-      }))
+      .map((exercise) => {
+        const sets = session.sets.filter((set) => set.exerciseId === exercise.id);
+        const latestSet = sets.at(-1);
+
+        return {
+          exerciseId: exercise.id,
+          name: exercise.name,
+          sets: sets.length,
+          reps: latestSet?.reps ?? exercise.targetReps,
+          weightLb: latestSet?.weightLb ?? exercise.weightLb,
+        };
+      })
       .filter((exercise) => exercise.sets > 0),
   };
 }
