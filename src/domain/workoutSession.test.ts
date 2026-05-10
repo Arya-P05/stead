@@ -2,7 +2,9 @@ import {
   addRestTime,
   completeSet,
   getActiveExercise,
+  getExerciseProgress,
   getRestRemainingSeconds,
+  selectExercise,
   skipRest,
   startWorkoutSession,
 } from './workoutSession';
@@ -54,6 +56,43 @@ describe('workout session', () => {
     ]);
     expect(session.restEndsAt).toBe(91200);
     expect(session.activeExerciseIndex).toBe(0);
+  });
+
+  it('reports exercise progress for the overview', () => {
+    const first = completeSet(startWorkoutSession(plan, 1000), plan, 1200);
+    const second = completeSet(first, plan, 92000);
+    const third = completeSet(second, plan, 183000);
+
+    expect(getExerciseProgress(plan, third)).toEqual([
+      {
+        exerciseId: 'incline-db-press',
+        completedSets: 3,
+        targetSets: 3,
+        complete: true,
+      },
+      {
+        exerciseId: 'shoulder-press',
+        completedSets: 0,
+        targetSets: 2,
+        complete: false,
+      },
+    ]);
+  });
+
+  it('selects an unfinished exercise for set logging', () => {
+    const session = selectExercise(startWorkoutSession(plan, 1000), plan, 1);
+
+    expect(session.activeExerciseIndex).toBe(1);
+    expect(session.restEndsAt).toBeNull();
+    expect(getActiveExercise(plan, session)?.id).toBe('shoulder-press');
+  });
+
+  it('does not select a completed exercise', () => {
+    const first = completeSet(startWorkoutSession(plan, 1000), plan, 1200);
+    const second = completeSet(first, plan, 92000);
+    const third = completeSet(second, plan, 183000);
+
+    expect(selectExercise(third, plan, 0)).toBe(third);
   });
 
   it('advances after the target sets are completed', () => {
