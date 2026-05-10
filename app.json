@@ -13,8 +13,16 @@
       "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "stead reads your steps to make timely nudges.",
+        "NSHealthUpdateUsageDescription": "stead may write workout activity you choose to track."
+      }
     },
+    "plugins": [
+      "@kingstinct/react-native-healthkit",
+      "expo-notifications"
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
