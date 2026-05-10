@@ -23,8 +23,6 @@ import {
 } from './src/domain/workoutSession';
 import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
 import {
-  addDailyOutcome,
-  addStepSample,
   addWorkoutOutcome,
   createInitialAppState,
   upsertExerciseWeight,
@@ -32,11 +30,13 @@ import {
 import type { AppState } from './src/data/appState';
 import { loadAppState, saveAppState } from './src/data/storage';
 import { createWorkoutOutcome } from './src/data/workoutOutcome';
+import { createCalendarDays } from './src/data/calendarDays';
+import type { CalendarDay } from './src/data/calendarDays';
 
 const today = {
-  dateLabel: 'tuesday',
-  dateMeta: 'march 4',
-  steps: 6420,
+  date: '2026-05-09',
+  dateLabel: 'saturday',
+  dateMeta: 'may 9',
   stepGoal: 10000,
   focusMinutes: 154,
   workout: 'push day',
@@ -113,22 +113,9 @@ const workoutPlan: WorkoutPlan = {
   ],
 };
 
-const recommendation = chooseRecommendation({
-  steps: today.steps,
-  stepGoal: today.stepGoal,
-  minutesWorked: today.focusMinutes,
-  minutesUntilNextEvent: today.minutesUntilNextEvent,
-  weather: today.weather,
-  workout: {
-    planned: true,
-    completed: false,
-    name: today.workout,
-  },
-});
-
 type FeedbackState = 'idle' | 'success' | 'warning';
 type WorkoutMode = 'exercise' | 'voice';
-type Surface = 'home' | 'day';
+type Surface = 'home' | 'calendar' | 'day';
 
 function ActionText({
   children,
@@ -234,17 +221,29 @@ function DaySurface({
   loggedSets,
   onBack,
   onWorkout,
+  selectedDate,
+  selectedOutcome,
 }: {
   loggedSets: number;
   onBack: () => void;
   onWorkout: () => void;
+  selectedDate: string;
+  selectedOutcome?: AppState['dailyOutcomes'][number];
 }) {
+  const isToday = selectedDate === today.date;
+
   return (
     <View style={styles.content}>
       <View style={styles.dayHeader}>
         <View>
-          <Text style={styles.titleText}>{today.dateLabel}</Text>
-          <Text style={styles.metadataText}>{today.dateMeta}</Text>
+          <Text style={styles.titleText}>{isToday ? today.dateLabel : selectedDate.slice(5)}</Text>
+          <Text style={styles.metadataText}>
+            {selectedOutcome
+              ? `${selectedOutcome.completedItems} / ${selectedOutcome.plannedItems} done`
+              : isToday
+                ? today.dateMeta
+                : 'no tracked outcome'}
+          </Text>
         </View>
         <Text style={styles.monoMeta}>{loggedSets > 0 ? `${loggedSets} / 17` : '5 / 7'}</Text>
       </View>
@@ -260,14 +259,52 @@ function DaySurface({
         ))}
       </View>
 
-      <View style={styles.nudgeLine}>
-        <Text style={styles.metadataText}>{recommendation.action}</Text>
-        <Text style={styles.monoMeta}>{recommendation.reason}</Text>
+      <View style={styles.bottomActions}>
+        <ActionText onPress={onBack}>home</ActionText>
+        <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
+      </View>
+    </View>
+  );
+}
+
+function CalendarSurface({
+  days,
+  onBack,
+  onSelectDate,
+}: {
+  days: CalendarDay[];
+  onBack: () => void;
+  onSelectDate: (date: string) => void;
+}) {
+  return (
+    <View style={styles.content}>
+      <View style={styles.dayHeader}>
+        <View>
+          <Text style={styles.titleText}>calendar</Text>
+          <Text style={styles.metadataText}>tracked days are brighter</Text>
+        </View>
+      </View>
+
+      <View style={styles.calendarGrid}>
+        {days.map((day) => (
+          <Pressable
+            key={day.date}
+            disabled={!day.tracked}
+            onPress={() => onSelectDate(day.date)}
+            style={styles.calendarCell}
+          >
+            <Text style={[styles.calendarLabel, !day.tracked && styles.untrackedText]}>
+              {day.label}
+            </Text>
+            <Text style={[styles.calendarMeta, !day.tracked && styles.untrackedText]}>
+              {day.tracked ? 'tracked' : 'empty'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>home</ActionText>
-        <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
       </View>
     </View>
   );
@@ -433,14 +470,28 @@ function Home() {
   const [appState, setAppState] = useState<AppState>(() => createInitialAppState());
   const [hydrated, setHydrated] = useState(false);
   const [surface, setSurface] = useState<Surface>('home');
+  const [selectedDate, setSelectedDate] = useState(today.date);
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(workoutPlan, Date.now()),
   );
   const loggedSets = workoutSession.sets.length;
-  const latestSteps = appState.stepSamples[0]?.steps ?? today.steps;
+  const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
-  const completedWorkouts = appState.workoutOutcomes.length;
+  const calendarDays = createCalendarDays(appState.dailyOutcomes, today.date);
+  const selectedOutcome = appState.dailyOutcomes.find((outcome) => outcome.date === selectedDate);
+  const recommendation = chooseRecommendation({
+    steps: latestSteps,
+    stepGoal: today.stepGoal,
+    minutesWorked: today.focusMinutes,
+    minutesUntilNextEvent: today.minutesUntilNextEvent,
+    weather: today.weather,
+    workout: {
+      planned: true,
+      completed: false,
+      name: today.workout,
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -465,27 +516,6 @@ function Home() {
 
   const logWorkoutSet = () => {
     setWorkoutSession((session) => completeSet(session, workoutPlan, Date.now()));
-  };
-  const logWalk = () => {
-    const steps = Math.min(today.stepGoal, latestSteps + 1200);
-
-    setAppState((state) =>
-      addDailyOutcome(
-        addStepSample(state, {
-          capturedAt: Date.now(),
-          steps,
-          source: 'manual',
-        }),
-        {
-          date: '2026-03-04',
-          completedItems: 6,
-          plannedItems: 7,
-          steps,
-          focusMinutes: today.focusMinutes,
-          note: 'walk logged',
-        },
-      ),
-    );
   };
   const endWorkout = () => {
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
@@ -515,55 +545,50 @@ function Home() {
         <View style={styles.homeContent}>
           <View style={styles.homeHeader}>
             <Text style={styles.brand}>stead</Text>
-            <Text style={styles.metadataText}>
-              {completedWorkouts > 0 ? `${completedWorkouts} workouts logged` : 'day 01 · lock in'}
-            </Text>
+            <Pressable onPress={() => setSurface('calendar')} hitSlop={10}>
+              <Text style={styles.metadataText}>
+                {today.dateLabel} · {today.dateMeta}
+              </Text>
+            </Pressable>
           </View>
 
           <View style={styles.recommendation}>
-            <Text style={styles.indexText}>next</Text>
             <Text style={styles.nextAction}>{recommendation.action}</Text>
             <Text style={styles.supporting}>{recommendation.reason}</Text>
           </View>
 
           <View style={styles.inlineActions}>
-            <ActionText onPress={logWalk}>walk logged</ActionText>
-            <Text style={styles.dot}>·</Text>
             <ActionText onPress={() => setWorkoutVisible(true)}>workout</ActionText>
-            <Text style={styles.dot}>·</Text>
-            <ActionText onPress={() => setSurface('day')}>today</ActionText>
           </View>
 
           <View style={styles.progressBlock}>
             <View style={styles.progressHeader}>
               <Text style={styles.indexText}>steps</Text>
-              <Text style={styles.monoMeta}>{latestSteps.toLocaleString()} / 10,000</Text>
+              <Text style={styles.monoMeta}>
+                {latestSteps > 0 ? `${latestSteps.toLocaleString()} / 10,000` : 'healthkit pending'}
+              </Text>
             </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${stepProgress * 100}%` }]} />
             </View>
           </View>
-
-          <View style={styles.metrics}>
-            <View style={styles.metric}>
-              <Text style={styles.indexText}>focus</Text>
-              <Text style={styles.metricValue}>2h 34m</Text>
-              <Text style={styles.metadataText}>deep work today</Text>
-            </View>
-            <View style={styles.metric}>
-              <Text style={styles.indexText}>body</Text>
-              <Text style={styles.metricValue}>{today.workout}</Text>
-              <Text style={styles.metadataText}>
-                {loggedSets > 0 ? `${loggedSets} sets logged` : 'planned session'}
-              </Text>
-            </View>
-          </View>
         </View>
+      ) : surface === 'calendar' ? (
+        <CalendarSurface
+          days={calendarDays}
+          onBack={() => setSurface('home')}
+          onSelectDate={(date) => {
+            setSelectedDate(date);
+            setSurface('day');
+          }}
+        />
       ) : (
         <DaySurface
           loggedSets={loggedSets}
           onBack={() => setSurface('home')}
           onWorkout={() => setWorkoutVisible(true)}
+          selectedDate={selectedDate}
+          selectedOutcome={selectedOutcome}
         />
       )}
 
@@ -671,6 +696,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.72)',
     borderRadius: 999,
     height: 3,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    paddingTop: 64,
+  },
+  calendarCell: {
+    gap: 6,
+    width: 54,
+  },
+  calendarLabel: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+  },
+  calendarMeta: {
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+  },
+  untrackedText: {
+    opacity: opacity.disabled,
   },
   metrics: {
     flexDirection: 'row',
