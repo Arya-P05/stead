@@ -14,13 +14,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "infoPlist": {
-        "NSHealthShareUsageDescription": "stead reads your steps to make timely nudges.",
-        "NSHealthUpdateUsageDescription": "stead may write workout activity you choose to track."
-      }
+      "bundleIdentifier": "com.patelarya.stead"
     },
     "plugins": [
-      "@kingstinct/react-native-healthkit",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "stead reads your steps to make timely nudges.",
+          "NSHealthUpdateUsageDescription": "stead may write workout activity you choose to track."
+        }
+      ],
       "expo-notifications"
     ],
     "android": {
@@ -29,7 +32,8 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.patelarya.stead"
     },
     "web": {
       "favicon": "./assets/favicon.png"
