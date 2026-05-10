@@ -19,7 +19,9 @@ import {
   addRestTime,
   completeSet,
   getActiveExercise,
+  getExerciseProgress,
   getRestRemainingSeconds,
+  selectExercise,
   skipRest,
   startWorkoutSession,
 } from './src/domain/workoutSession';
@@ -122,7 +124,7 @@ const workoutPlan: WorkoutPlan = {
 };
 
 type FeedbackState = 'idle' | 'success' | 'warning';
-type WorkoutMode = 'exercise' | 'voice';
+type WorkoutMode = 'overview' | 'exercise' | 'voice';
 type Surface = 'home' | 'calendar' | 'day';
 
 function ActionText({
@@ -422,6 +424,7 @@ function WorkoutSurface({
   onAddRest,
   onClose,
   onLogSet,
+  onSelectExercise,
   onSkipRest,
 }: {
   session: WorkoutSession;
@@ -429,11 +432,13 @@ function WorkoutSurface({
   onAddRest: () => void;
   onClose: () => void;
   onLogSet: () => void;
+  onSelectExercise: (index: number) => void;
   onSkipRest: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
-  const [mode, setMode] = useState<WorkoutMode>('exercise');
+  const [mode, setMode] = useState<WorkoutMode>('overview');
   const activeExercise = getActiveExercise(workoutPlan, session);
+  const exerciseProgress = getExerciseProgress(workoutPlan, session);
   const restSeconds = getRestRemainingSeconds(session, now);
   const isResting = restSeconds > 0;
   const completedSets = activeExercise
@@ -449,6 +454,7 @@ function WorkoutSurface({
       return undefined;
     }
 
+    setMode('overview');
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
 
@@ -480,7 +486,50 @@ function WorkoutSurface({
             </Text>
           </View>
 
-          {mode === 'voice' ? (
+          {mode === 'overview' ? (
+            <View style={styles.workoutOverview}>
+              <Text style={styles.metadataText}>
+                {session.sets.length} of {workoutPlan.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0)} sets
+              </Text>
+              <View style={styles.workoutExerciseList}>
+                {workoutPlan.exercises.map((exercise, index) => {
+                  const progress = exerciseProgress[index];
+
+                  return (
+                    <Pressable
+                      key={exercise.id}
+                      disabled={progress.complete}
+                      onPress={() => {
+                        onSelectExercise(index);
+                        setMode('exercise');
+                      }}
+                      style={styles.workoutExerciseRow}
+                    >
+                      <IndexText active={!progress.complete && index === session.activeExerciseIndex}>
+                        {String(index + 1).padStart(2, '0')}
+                      </IndexText>
+                      <View style={styles.workoutExerciseCopy}>
+                        <Text
+                          style={[
+                            styles.workoutExerciseName,
+                            progress.complete && styles.untrackedText,
+                          ]}
+                        >
+                          {exercise.name}
+                        </Text>
+                        <Text style={styles.monoMeta}>
+                          {progress.completedSets}/{exercise.targetSets} sets · {exercise.targetReps ?? 10} reps · {exercise.weightLb ?? 50} lb
+                        </Text>
+                      </View>
+                      <Text style={[styles.setNow, progress.complete && styles.successText]}>
+                        {progress.complete ? 'done' : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : mode === 'voice' ? (
             <View style={styles.voiceSurface}>
               <View style={styles.listeningRow}>
                 <View style={styles.listeningDot} />
@@ -543,15 +592,19 @@ function WorkoutSurface({
               </>
             ) : isResting ? (
               <>
+                <ActionText onPress={() => setMode('overview')}>list</ActionText>
                 <ActionText onPress={onSkipRest}>skip</ActionText>
                 <ActionText onPress={onAddRest}>+30s</ActionText>
+              </>
+            ) : mode === 'overview' ? (
+              <>
                 <ActionText onPress={onClose}>end</ActionText>
               </>
             ) : (
               <>
+                <ActionText onPress={() => setMode('overview')}>list</ActionText>
                 <ActionText onPress={() => setMode('voice')}>voice</ActionText>
                 <ActionText onPress={onLogSet}>log set</ActionText>
-                <ActionText onPress={onClose}>skip</ActionText>
               </>
             )}
           </View>
@@ -617,6 +670,9 @@ function Home() {
 
   const logWorkoutSet = () => {
     setWorkoutSession((session) => completeSet(session, workoutPlan, Date.now()));
+  };
+  const selectWorkoutExercise = (index: number) => {
+    setWorkoutSession((session) => selectExercise(session, workoutPlan, index));
   };
   const endWorkout = () => {
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
@@ -697,6 +753,7 @@ function Home() {
         onAddRest={() => setWorkoutSession((session) => addRestTime(session, 30))}
         onClose={endWorkout}
         onLogSet={logWorkoutSet}
+        onSelectExercise={selectWorkoutExercise}
         onSkipRest={() => setWorkoutSession((session) => skipRest(session))}
       />
     </SafeAreaView>
@@ -1023,6 +1080,30 @@ const styles = StyleSheet.create({
   nudgeLine: {
     gap: 4,
     marginTop: 42,
+  },
+  workoutOverview: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 72,
+  },
+  workoutExerciseList: {
+    gap: 24,
+    marginTop: 44,
+  },
+  workoutExerciseRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+  },
+  workoutExerciseCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  workoutExerciseName: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
   },
   exerciseSurface: {
     flex: 1,
