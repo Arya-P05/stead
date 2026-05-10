@@ -16,14 +16,15 @@ stead is meant to become a quiet personal EA: it knows your day, your goals, you
 - Product plan at `docs/plan.md`.
 - Home surface with next action, step progress, focus state, and workout entry.
 - Tested recommendation engine for the next action.
-- Workout sheet with real set logging, exercise progress, and rest countdown copy.
+- Workout sheet with real set logging, exercise progress, rest countdown, editable plan targets, and dictation-friendly voice logs.
+- Local persistence for workout outcomes, daily outcomes, active workout sessions, weights, and HealthKit step samples.
 - Haptic and visual feedback for text actions.
 
 ## run
 
 ```sh
 npm install
-npm run ios
+npx expo run:ios --device "iPhone 16"
 ```
 
 For a local dev server:
