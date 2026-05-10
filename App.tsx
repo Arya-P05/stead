@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -35,6 +35,7 @@ import {
   createInitialAppState,
   hasCompletedWorkout,
   saveActiveWorkoutSession,
+  saveWorkoutPlan,
   upsertExerciseWeight,
 } from './src/data/appState';
 import type { AppState } from './src/data/appState';
@@ -44,6 +45,8 @@ import { createCalendarMonth } from './src/data/calendarDays';
 import type { CalendarMonth } from './src/data/calendarDays';
 import { scheduleRecommendationNudge } from './src/services/notifications';
 import { syncTodaySteps } from './src/services/healthkit';
+import { createDefaultWorkoutPlan, updateExercise } from './src/data/workoutPlan';
+import { parseWorkoutVoiceLog } from './src/domain/voiceLog';
 
 const today = {
   date: '2026-05-09',
@@ -84,55 +87,8 @@ const remainingItems = [
   { title: 'read', time: '9:00' },
 ];
 
-const workoutPlan: WorkoutPlan = {
-  id: 'push-day',
-  name: 'push day',
-  exercises: [
-    {
-      id: 'incline-db-press',
-      name: 'incline dumbbell press',
-      targetSets: 4,
-      targetReps: 10,
-      weightLb: 50,
-      restSeconds: 90,
-    },
-    {
-      id: 'shoulder-press',
-      name: 'shoulder press',
-      targetSets: 3,
-      targetReps: 10,
-      weightLb: 40,
-      restSeconds: 90,
-    },
-    {
-      id: 'cable-fly',
-      name: 'cable fly',
-      targetSets: 3,
-      targetReps: 12,
-      weightLb: 25,
-      restSeconds: 60,
-    },
-    {
-      id: 'tricep-pushdown',
-      name: 'tricep pushdown',
-      targetSets: 3,
-      targetReps: 15,
-      weightLb: 35,
-      restSeconds: 60,
-    },
-    {
-      id: 'lat-raise',
-      name: 'lat raise',
-      targetSets: 3,
-      targetReps: 12,
-      weightLb: 15,
-      restSeconds: 45,
-    },
-  ],
-};
-
 type FeedbackState = 'idle' | 'success' | 'warning';
-type WorkoutMode = 'overview' | 'exercise' | 'voice';
+type WorkoutMode = 'overview' | 'exercise' | 'voice' | 'plan';
 type Surface = 'home' | 'calendar' | 'day';
 
 function parseWorkoutVisualKey(key: string): { mode: WorkoutMode; isResting: boolean } {
@@ -432,38 +388,63 @@ function FormatTimer({ seconds }: { seconds: number }) {
   );
 }
 
+function namesMatch(planName: string, transcriptName: string) {
+  const normalizedPlan = normalizeName(planName);
+  const normalizedTranscript = normalizeName(transcriptName);
+
+  return (
+    normalizedPlan.includes(normalizedTranscript) ||
+    normalizedTranscript.includes(normalizedPlan) ||
+    normalizedPlan.replace('dumbbell', 'db').includes(normalizedTranscript)
+  );
+}
+
+function normalizeName(value: string) {
+  return value.toLowerCase().replace(/\bdumbbell\b/g, 'db').replace(/\s+/g, ' ').trim();
+}
+
 function WorkoutSurface({
+  plan,
   session,
   visible,
   onAddRest,
   onBack,
   onFinishWorkout,
   onLogSet,
+  onLogVoice,
   onSelectExercise,
   onSkipRest,
+  onUpdateExercise,
 }: {
+  plan: WorkoutPlan;
   session: WorkoutSession;
   visible: boolean;
   onAddRest: () => void;
   onBack: () => void;
   onFinishWorkout: () => void;
   onLogSet: () => void;
+  onLogVoice: (transcript: string) => boolean;
   onSelectExercise: (index: number) => void;
   onSkipRest: () => void;
+  onUpdateExercise: (exerciseId: string, patch: Parameters<typeof updateExercise>[2]) => void;
 }) {
   const [now, setNow] = useState(Date.now());
   const [mode, setMode] = useState<WorkoutMode>('overview');
-  const activeExercise = getActiveExercise(workoutPlan, session);
-  const exerciseProgress = getExerciseProgress(workoutPlan, session);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [planExerciseIndex, setPlanExerciseIndex] = useState(0);
+  const activeExercise = getActiveExercise(plan, session);
+  const exerciseProgress = getExerciseProgress(plan, session);
   const restSeconds = getRestRemainingSeconds(session, now);
   const isResting = restSeconds > 0;
   const completedSets = activeExercise
     ? session.sets.filter((set) => set.exerciseId === activeExercise.id).length
     : 0;
-  const exerciseIndex = Math.min(session.activeExerciseIndex + 1, workoutPlan.exercises.length);
+  const exerciseIndex = Math.min(session.activeExerciseIndex + 1, plan.exercises.length);
   const setLabel = activeExercise
     ? `set  ${Math.min(completedSets + 1, activeExercise.targetSets)} of ${activeExercise.targetSets}`
     : 'done';
+  const selectedPlanExercise = plan.exercises[planExerciseIndex] ?? plan.exercises[0];
+  const parsedVoiceLog = parseWorkoutVoiceLog(voiceTranscript);
 
   useEffect(() => {
     if (!visible) {
@@ -504,11 +485,11 @@ function WorkoutSurface({
         >
           <View style={styles.liveHeader}>
             <Text style={styles.metadataText}>
-              {workoutPlan.name}
+              {plan.name}
               {mode === 'voice' ? ' · live' : ''}
             </Text>
             <Text style={styles.monoMeta}>
-              {mode === 'voice' ? '00:14' : isResting ? setLabel : `${String(exerciseIndex).padStart(2, '0')}  of  ${String(workoutPlan.exercises.length).padStart(2, '0')}`}
+              {mode === 'voice' ? 'dictate' : isResting ? setLabel : `${String(exerciseIndex).padStart(2, '0')}  of  ${String(plan.exercises.length).padStart(2, '0')}`}
             </Text>
           </View>
 
@@ -516,10 +497,10 @@ function WorkoutSurface({
             {stageView.mode === 'overview' ? (
               <View style={styles.workoutOverview}>
                 <Text style={styles.metadataText}>
-                  {session.sets.length} of {workoutPlan.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0)} sets
+                  {session.sets.length} of {plan.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0)} sets
                 </Text>
                 <View style={styles.workoutExerciseList}>
-                  {workoutPlan.exercises.map((exercise, index) => {
+                  {plan.exercises.map((exercise, index) => {
                     const progress = exerciseProgress[index];
 
                     return (
@@ -562,10 +543,52 @@ function WorkoutSurface({
               <View style={styles.voiceSurface}>
                 <View style={styles.listeningRow}>
                   <PulsingDot style={styles.listeningDot} />
-                  <Text style={styles.bodyText}>listening</Text>
+                  <Text style={styles.bodyText}>dictate or type</Text>
                 </View>
-                <Text style={styles.voiceText}>three sets of forty{'\n'}on incline dumbbell press</Text>
-                <Text style={styles.metadataText}>captured · ready to log</Text>
+                <TextInput
+                  autoFocus
+                  multiline
+                  onChangeText={setVoiceTranscript}
+                  placeholder="three sets of forty on incline dumbbell press"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  returnKeyType="done"
+                  style={styles.voiceInput}
+                  value={voiceTranscript}
+                />
+                <Text style={styles.metadataText}>uses keyboard dictation today</Text>
+              </View>
+            ) : stageView.mode === 'plan' && selectedPlanExercise ? (
+              <View style={styles.planSurface}>
+                <Text style={styles.metadataText}>edit plan</Text>
+                <View style={styles.workoutExerciseList}>
+                  {plan.exercises.map((exercise, index) => (
+                    <PressableScale
+                      key={exercise.id}
+                      onPress={() => setPlanExerciseIndex(index)}
+                      style={styles.workoutExerciseRow}
+                    >
+                      <IndexText active={index === planExerciseIndex}>
+                        {String(index + 1).padStart(2, '0')}
+                      </IndexText>
+                      <View style={styles.workoutExerciseCopy}>
+                        <Text
+                          style={[
+                            styles.workoutExerciseName,
+                            index !== planExerciseIndex && styles.untrackedText,
+                          ]}
+                        >
+                          {exercise.name}
+                        </Text>
+                        <Text style={styles.monoMeta}>
+                          {exercise.targetSets} × {exercise.targetReps ?? 10} · {exercise.weightLb ?? 0} lb · {exercise.restSeconds}s
+                        </Text>
+                      </View>
+                    </PressableScale>
+                  ))}
+                </View>
+                <Text style={styles.supporting}>
+                  selected · {selectedPlanExercise.name}
+                </Text>
               </View>
             ) : stageView.isResting ? (
               <View style={styles.restSurface}>
@@ -618,7 +641,39 @@ function WorkoutSurface({
             {mode === 'voice' ? (
               <>
                 <ActionText onPress={() => setMode('exercise')}>back</ActionText>
-                <ActionText onPress={onLogSet}>log</ActionText>
+                <ActionText
+                  disabled={!parsedVoiceLog}
+                  onPress={() => {
+                    if (onLogVoice(voiceTranscript)) {
+                      setVoiceTranscript('');
+                      setMode('overview');
+                    }
+                  }}
+                >
+                  log
+                </ActionText>
+              </>
+            ) : mode === 'plan' && selectedPlanExercise ? (
+              <>
+                <ActionText onPress={() => setMode('overview')}>back</ActionText>
+                <ActionText
+                  onPress={() =>
+                    onUpdateExercise(selectedPlanExercise.id, {
+                      targetReps: (selectedPlanExercise.targetReps ?? 10) + 1,
+                    })
+                  }
+                >
+                  reps +1
+                </ActionText>
+                <ActionText
+                  onPress={() =>
+                    onUpdateExercise(selectedPlanExercise.id, {
+                      weightLb: (selectedPlanExercise.weightLb ?? 0) + 5,
+                    })
+                  }
+                >
+                  lb +5
+                </ActionText>
               </>
             ) : isResting ? (
               <>
@@ -629,6 +684,7 @@ function WorkoutSurface({
             ) : mode === 'overview' ? (
               <>
                 <ActionText onPress={onBack}>back</ActionText>
+                <ActionText onPress={() => setMode('plan')}>edit plan</ActionText>
                 <ActionText onPress={onFinishWorkout}>finish workout</ActionText>
               </>
             ) : (
@@ -657,8 +713,9 @@ function Home() {
   const [visibleMonthDate, setVisibleMonthDate] = useState(today.date);
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
-    startWorkoutSession(workoutPlan, Date.now()),
+    startWorkoutSession(createDefaultWorkoutPlan(), Date.now()),
   );
+  const workoutPlan = appState.workoutPlan;
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
@@ -674,11 +731,11 @@ function Home() {
     workout: {
       planned: true,
       completed: workoutComplete,
-      name: today.workout,
+      name: workoutPlan.name,
     },
   });
   const openItems = workoutComplete
-    ? remainingItems.filter((item) => item.title !== today.workout)
+    ? remainingItems.filter((item) => item.title !== workoutPlan.name)
     : remainingItems;
   const homeMiddle = chooseHomeMiddle({
     minutesWorked: today.focusMinutes,
@@ -747,6 +804,38 @@ function Home() {
       return nextSession;
     });
   };
+  const logWorkoutVoice = (transcript: string) => {
+    const parsed = parseWorkoutVoiceLog(transcript);
+
+    if (!parsed) {
+      return false;
+    }
+
+    const exerciseIndex = workoutPlan.exercises.findIndex((exercise) =>
+      namesMatch(exercise.name, parsed.exerciseName),
+    );
+
+    if (exerciseIndex === -1) {
+      return false;
+    }
+
+    setWorkoutSession((session) => {
+      let nextSession = selectExercise(session, workoutPlan, exerciseIndex);
+
+      for (let setIndex = 0; setIndex < parsed.sets; setIndex += 1) {
+        nextSession = completeSet(nextSession, workoutPlan, Date.now() + setIndex, {
+          reps: parsed.reps,
+          weightLb: parsed.weightLb,
+        });
+      }
+
+      setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+
+      return nextSession;
+    });
+
+    return true;
+  };
   const selectWorkoutExercise = (index: number) => {
     setWorkoutSession((session) => {
       const nextSession = selectExercise(session, workoutPlan, index);
@@ -780,6 +869,12 @@ function Home() {
     });
     setWorkoutSession(startWorkoutSession(workoutPlan, Date.now()));
     setWorkoutVisible(false);
+  };
+  const editWorkoutExercise = (
+    exerciseId: string,
+    patch: Parameters<typeof updateExercise>[2],
+  ) => {
+    setAppState((state) => saveWorkoutPlan(state, updateExercise(state.workoutPlan, exerciseId, patch)));
   };
 
   return (
@@ -837,6 +932,7 @@ function Home() {
       </Animated.View>
 
       <WorkoutSurface
+        plan={workoutPlan}
         session={workoutSession}
         visible={workoutVisible}
         onAddRest={() =>
@@ -851,6 +947,7 @@ function Home() {
         onBack={closeWorkout}
         onFinishWorkout={finishWorkout}
         onLogSet={logWorkoutSet}
+        onLogVoice={logWorkoutVoice}
         onSelectExercise={selectWorkoutExercise}
         onSkipRest={() =>
           setWorkoutSession((session) => {
@@ -861,6 +958,7 @@ function Home() {
             return nextSession;
           })
         }
+        onUpdateExercise={editWorkoutExercise}
       />
     </SafeAreaView>
   );
@@ -1319,6 +1417,23 @@ const styles = StyleSheet.create({
     marginBottom: 44,
     opacity: opacity.title,
     textAlign: 'center',
+  },
+  voiceInput: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 29,
+    marginBottom: 44,
+    minHeight: 96,
+    opacity: opacity.title,
+    textAlign: 'center',
+    width: '100%',
+  },
+  planSurface: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 72,
   },
   actionText: {
     fontSize: typeScale.action,
