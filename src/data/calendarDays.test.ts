@@ -64,6 +64,20 @@ describe('createCalendarMonth', () => {
     });
   });
 
+  it('pads the final week so columns stay aligned', () => {
+    const month = createCalendarMonth(outcomes, '2026-05-11', '2026-05-01');
+
+    expect(month.weeks.at(-1)).toEqual([
+      { date: '2026-05-31', label: '31', tracked: false, selectable: false, future: true },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
   it('can build a previous visible month', () => {
     const month = createCalendarMonth(outcomes, '2026-05-11', '2026-04-01');
     const days = month.weeks.flat().filter((day) => day !== null);

@@ -73,8 +73,12 @@ export function createCalendarMonth(
   return {
     label: `${monthNames[month]} ${year}`,
     meta: createMonthMeta({ month, today, trackedDates, year }),
-    weeks: weeks.filter((week) => week.length > 0),
+    weeks: weeks.filter((week) => week.length > 0).map(padWeek),
   };
+}
+
+function padWeek(week: Array<CalendarDay | null>) {
+  return [...week, ...Array.from({ length: 7 - week.length }, () => null)];
 }
 
 function createMonthMeta({
