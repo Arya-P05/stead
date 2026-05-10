@@ -11,17 +11,25 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { colors, opacity, spacing, typography } from './src/designSystem';
+import { colors, opacity, spacing, typeScale, typography } from './src/designSystem';
 import { chooseRecommendation } from './src/domain/recommendations';
-import { completeSet, startWorkoutSession } from './src/domain/workoutSession';
+import {
+  addRestTime,
+  completeSet,
+  getActiveExercise,
+  getRestRemainingSeconds,
+  skipRest,
+  startWorkoutSession,
+} from './src/domain/workoutSession';
 import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
-import { getWorkoutStatus } from './src/domain/workoutStatus';
 
 const today = {
+  dateLabel: 'tuesday',
+  dateMeta: 'march 4',
   steps: 6420,
   stepGoal: 10000,
   focusMinutes: 154,
-  workout: 'upper push',
+  workout: 'push day',
   minutesUntilNextEvent: 90,
   weather: {
     condition: 'sunny' as const,
@@ -30,27 +38,67 @@ const today = {
   },
 };
 
+type DayItem = {
+  title: string;
+  detail: string;
+  time: string;
+  active?: boolean;
+  action?: 'workout';
+};
+
+const dayItems: DayItem[] = [
+  { title: 'walk', detail: 'ten min', time: '8:30' },
+  { title: 'focus', detail: '2h 14m', time: '9:00' },
+  { title: 'walk', detail: 'ten min', time: '12:30' },
+  { title: 'lunch', detail: '20 min', time: '1:00' },
+  { title: 'focus', detail: 'in flow', time: 'now', active: true },
+  { title: 'push day', detail: '47 min', time: '6:30', action: 'workout' },
+  { title: 'read', detail: '30 min', time: '9:00' },
+];
+
 const workoutPlan: WorkoutPlan = {
-  id: 'upper-push',
-  name: 'upper push',
+  id: 'push-day',
+  name: 'push day',
   exercises: [
     {
       id: 'incline-db-press',
       name: 'incline dumbbell press',
-      targetSets: 3,
+      targetSets: 4,
+      targetReps: 10,
+      weightLb: 50,
       restSeconds: 90,
     },
     {
       id: 'shoulder-press',
       name: 'shoulder press',
       targetSets: 3,
+      targetReps: 10,
+      weightLb: 40,
       restSeconds: 90,
     },
     {
       id: 'cable-fly',
       name: 'cable fly',
       targetSets: 3,
+      targetReps: 12,
+      weightLb: 25,
       restSeconds: 60,
+    },
+    {
+      id: 'tricep-pushdown',
+      name: 'tricep pushdown',
+      targetSets: 3,
+      targetReps: 15,
+      weightLb: 35,
+      restSeconds: 60,
+    },
+    {
+      id: 'lat-raise',
+      name: 'lat raise',
+      targetSets: 3,
+      targetReps: 12,
+      weightLb: 15,
+      restSeconds: 45,
     },
   ],
 };
@@ -69,6 +117,7 @@ const recommendation = chooseRecommendation({
 });
 
 type FeedbackState = 'idle' | 'success' | 'warning';
+type WorkoutMode = 'exercise' | 'voice';
 
 function ActionText({
   children,
@@ -96,7 +145,7 @@ function ActionText({
 
     Animated.sequence([
       Animated.timing(translateY, {
-        toValue: -3,
+        toValue: -1,
         duration: 90,
         useNativeDriver: true,
       }),
@@ -107,7 +156,7 @@ function ActionText({
       }),
     ]).start();
 
-    setTimeout(() => setFeedback('idle'), 520);
+    setTimeout(() => setFeedback('idle'), 480);
   };
 
   const color =
@@ -124,7 +173,7 @@ function ActionText({
           styles.actionText,
           {
             color,
-            opacity: disabled ? opacity.unavailable : opacity.secondary,
+            opacity: disabled ? opacity.disabled : opacity.enabled,
             transform: [{ translateY }],
           },
         ]}
@@ -135,29 +184,79 @@ function ActionText({
   );
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.indexLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metadata}>{detail}</Text>
+function IndexText({ children, active }: { children: string; active?: boolean }) {
+  return <Text style={[styles.indexText, active && styles.activeText]}>{children}</Text>;
+}
+
+function DayRow({
+  index,
+  item,
+  onWorkout,
+}: {
+  index: number;
+  item: DayItem;
+  onWorkout: () => void;
+}) {
+  const row = (
+    <View style={styles.dayRow}>
+      <IndexText active={item.active}>{String(index + 1).padStart(2, '0')}</IndexText>
+      <View style={styles.dayCopy}>
+        <Text style={[styles.dayTitle, item.active && styles.activeText]}>{item.title}</Text>
+        <Text style={styles.dayDetail}>{item.detail}</Text>
+      </View>
+      <Text style={[styles.dayTime, item.active && styles.activeText]}>{item.time}</Text>
     </View>
+  );
+
+  if (item.action === 'workout') {
+    return (
+      <Pressable onPress={onWorkout} hitSlop={8}>
+        {row}
+      </Pressable>
+    );
+  }
+
+  return row;
+}
+
+function FormatTimer({ seconds }: { seconds: number }) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return (
+    <Text style={styles.restTimer}>
+      {minutes}:{String(remainingSeconds).padStart(2, '0')}
+    </Text>
   );
 }
 
-function WorkoutSheet({
+function WorkoutSurface({
   session,
   visible,
+  onAddRest,
   onClose,
   onLogSet,
+  onSkipRest,
 }: {
   session: WorkoutSession;
   visible: boolean;
+  onAddRest: () => void;
   onClose: () => void;
   onLogSet: () => void;
+  onSkipRest: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
-  const status = getWorkoutStatus(workoutPlan, session, now);
+  const [mode, setMode] = useState<WorkoutMode>('exercise');
+  const activeExercise = getActiveExercise(workoutPlan, session);
+  const restSeconds = getRestRemainingSeconds(session, now);
+  const isResting = restSeconds > 0;
+  const completedSets = activeExercise
+    ? session.sets.filter((set) => set.exerciseId === activeExercise.id).length
+    : 0;
+  const exerciseIndex = Math.min(session.activeExerciseIndex + 1, workoutPlan.exercises.length);
+  const setLabel = activeExercise
+    ? `set  ${Math.min(completedSets + 1, activeExercise.targetSets)} of ${activeExercise.targetSets}`
+    : 'done';
 
   useEffect(() => {
     if (!visible) {
@@ -170,37 +269,105 @@ function WorkoutSheet({
     return () => clearInterval(timer);
   }, [visible]);
 
+  useEffect(() => {
+    if (isResting) {
+      setMode('exercise');
+    }
+  }, [isResting]);
+
+  const targetLine = activeExercise
+    ? `${activeExercise.targetSets} × ${activeExercise.targetReps ?? 10} · ${activeExercise.weightLb ?? 50} lb`
+    : `${session.sets.length} sets logged`;
+
   return (
-    <Modal animationType="slide" visible={visible} presentationStyle="pageSheet">
-      <SafeAreaView style={styles.sheet}>
-        <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>{status.title}</Text>
-          <Text style={styles.sheetMeta}>{status.meta}</Text>
-
-          <View style={styles.exerciseList}>
-            {workoutPlan.exercises.map((exercise, index) => {
-              const completedSets = session.sets.filter(
-                (set) => set.exerciseId === exercise.id,
-              ).length;
-
-              return (
-                <View key={exercise.id} style={styles.exerciseRow}>
-                  <Text style={styles.indexLabel}>{String(index + 1).padStart(2, '0')}</Text>
-                  <View style={styles.exerciseCopy}>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                    <Text style={styles.metadata}>
-                      {completedSets}/{exercise.targetSets} sets · rest {exercise.restSeconds}s
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
+    <Modal animationType="slide" visible={visible} presentationStyle="fullScreen">
+      <SafeAreaView style={styles.screen}>
+        <StatusBar style="light" />
+        <View style={styles.liveContent}>
+          <View style={styles.liveHeader}>
+            <Text style={styles.metadataText}>
+              {workoutPlan.name}
+              {mode === 'voice' ? ' · live' : ''}
+            </Text>
+            <Text style={styles.monoMeta}>
+              {mode === 'voice' ? '00:14' : isResting ? setLabel : `${String(exerciseIndex).padStart(2, '0')}  of  ${String(workoutPlan.exercises.length).padStart(2, '0')}`}
+            </Text>
           </View>
 
-          <View style={styles.sheetActions}>
-            <ActionText onPress={status.isComplete ? onClose : onLogSet}>{status.action}</ActionText>
-            <Text style={styles.dot}>·</Text>
-            <ActionText onPress={onClose}>done</ActionText>
+          {mode === 'voice' ? (
+            <View style={styles.voiceSurface}>
+              <View style={styles.listeningRow}>
+                <View style={styles.listeningDot} />
+                <Text style={styles.bodyText}>listening</Text>
+              </View>
+              <Text style={styles.voiceText}>three sets of forty{'\n'}on incline dumbbell press</Text>
+              <Text style={styles.metadataText}>captured · ready to log</Text>
+            </View>
+          ) : isResting ? (
+            <View style={styles.restSurface}>
+              <Text style={styles.metadataText}>rest</Text>
+              <FormatTimer seconds={restSeconds} />
+              <View style={styles.restTicks}>
+                <View style={styles.restTickActive} />
+                <View style={styles.restTickActive} />
+                <View style={styles.restTick} />
+                <View style={styles.restTick} />
+              </View>
+              <View style={styles.nextBlock}>
+                <Text style={styles.metadataText}>next</Text>
+                <Text style={styles.bodyText}>{activeExercise?.name}</Text>
+                <Text style={styles.monoMeta}>{targetLine}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.exerciseSurface}>
+              <View>
+                <Text style={styles.exerciseTitle}>{activeExercise?.name ?? 'workout complete'}</Text>
+                <Text style={styles.monoMeta}>{targetLine}</Text>
+              </View>
+
+              <View style={styles.setList}>
+                {Array.from({ length: activeExercise?.targetSets ?? 0 }).map((_, index) => {
+                  const complete = index < completedSets;
+                  const current = index === completedSets;
+
+                  return (
+                    <View key={index} style={styles.setRow}>
+                      <IndexText active={current}>{String(index + 1).padStart(2, '0')}</IndexText>
+                      <Text style={[styles.setValue, !complete && !current && styles.disabledText]}>
+                        {complete || current
+                          ? `${activeExercise?.targetReps ?? 10} reps · ${activeExercise?.weightLb ?? 50} lb`
+                          : '- reps · - lb'}
+                      </Text>
+                      <Text style={[styles.setNow, current && styles.successText]}>
+                        {current ? 'now' : complete ? '-' : ''}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.bottomActions}>
+            {mode === 'voice' ? (
+              <>
+                <ActionText onPress={() => setMode('exercise')}>cancel</ActionText>
+                <ActionText onPress={onLogSet}>log</ActionText>
+              </>
+            ) : isResting ? (
+              <>
+                <ActionText onPress={onSkipRest}>skip</ActionText>
+                <ActionText onPress={onAddRest}>+30s</ActionText>
+                <ActionText onPress={onClose}>end</ActionText>
+              </>
+            ) : (
+              <>
+                <ActionText onPress={() => setMode('voice')}>voice</ActionText>
+                <ActionText onPress={onLogSet}>log set</ActionText>
+                <ActionText onPress={onClose}>skip</ActionText>
+              </>
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -213,7 +380,8 @@ function Home() {
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(workoutPlan, Date.now()),
   );
-  const stepProgress = Math.min(today.steps / today.stepGoal, 1);
+  const loggedSets = workoutSession.sets.length;
+
   const logWorkoutSet = () => {
     setWorkoutSession((session) => completeSet(session, workoutPlan, Date.now()));
   };
@@ -222,48 +390,45 @@ function Home() {
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.brand}>stead</Text>
-          <Text style={styles.metadata}>day 01 · lock in</Text>
-        </View>
-
-        <View style={styles.recommendation}>
-          <Text style={styles.indexLabel}>next</Text>
-          <Text style={styles.nextAction}>{recommendation.action}</Text>
-          <Text style={styles.supporting}>{recommendation.reason}</Text>
-        </View>
-
-        <View style={styles.actions}>
-          <ActionText onPress={() => undefined}>walk logged</ActionText>
-          <Text style={styles.dot}>·</Text>
-          <ActionText onPress={() => setWorkoutVisible(true)}>workout</ActionText>
-          <Text style={styles.dot}>·</Text>
-          <ActionText disabled onPress={() => undefined}>
-            voice soon
-          </ActionText>
-        </View>
-
-        <View style={styles.progressBlock}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.indexLabel}>steps</Text>
-            <Text style={styles.metadata}>{today.steps.toLocaleString()} / 10,000</Text>
+        <View style={styles.dayHeader}>
+          <View>
+            <Text style={styles.titleText}>{today.dateLabel}</Text>
+            <Text style={styles.metadataText}>{today.dateMeta}</Text>
           </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${stepProgress * 100}%` }]} />
-          </View>
+          <Text style={styles.monoMeta}>
+            {loggedSets > 0 ? `${loggedSets} / 17` : '5 / 7'}
+          </Text>
         </View>
 
-        <View style={styles.metrics}>
-          <Metric label="focus" value="2h 34m" detail="deep work today" />
-          <Metric label="body" value={today.workout} detail="planned session" />
+        <View style={styles.dayList}>
+          {dayItems.map((item, index) => (
+            <DayRow
+              key={`${item.title}-${index}`}
+              index={index}
+              item={item}
+              onWorkout={() => setWorkoutVisible(true)}
+            />
+          ))}
+        </View>
+
+        <View style={styles.nudgeLine}>
+          <Text style={styles.metadataText}>{recommendation.action}</Text>
+          <Text style={styles.monoMeta}>{recommendation.reason}</Text>
+        </View>
+
+        <View style={styles.bottomActions}>
+          <ActionText onPress={() => undefined}>add</ActionText>
+          <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
         </View>
       </View>
 
-      <WorkoutSheet
+      <WorkoutSurface
         session={workoutSession}
         visible={workoutVisible}
+        onAddRest={() => setWorkoutSession((session) => addRestTime(session, 30))}
         onClose={() => setWorkoutVisible(false)}
         onLogSet={logWorkoutSet}
+        onSkipRest={() => setWorkoutSession((session) => skipRest(session))}
       />
     </SafeAreaView>
   );
@@ -284,159 +449,232 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
-    paddingTop: 18,
-    paddingBottom: 34,
+    paddingTop: 54,
   },
-  header: {
-    gap: 6,
-  },
-  brand: {
-    color: colors.foreground,
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 0,
-    opacity: opacity.primary,
-  },
-  recommendation: {
+  liveContent: {
     flex: 1,
-    justifyContent: 'center',
-    gap: 12,
-  },
-  indexLabel: {
-    color: colors.foreground,
-    fontFamily: typography.mono,
-    fontSize: 12,
-    letterSpacing: 0,
-    opacity: opacity.muted,
-  },
-  nextAction: {
-    color: colors.foreground,
-    fontSize: 34,
-    fontWeight: '600',
-    letterSpacing: 0,
-    lineHeight: 39,
-    opacity: opacity.primary,
-  },
-  supporting: {
-    color: colors.foreground,
-    fontSize: 17,
-    letterSpacing: 0,
-    lineHeight: 24,
-    opacity: opacity.secondary,
-  },
-  actions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    paddingBottom: 44,
-  },
-  actionText: {
-    fontSize: 16,
-    letterSpacing: 0,
-    lineHeight: 24,
-  },
-  dot: {
-    color: colors.foreground,
-    fontSize: 16,
-    opacity: opacity.muted,
-  },
-  progressBlock: {
-    gap: 12,
     paddingBottom: 34,
+    paddingHorizontal: spacing.screenX,
+    paddingTop: 44,
   },
-  progressHeader: {
+  dayHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  liveHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  progressTrack: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
-    height: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
-    borderRadius: 999,
-    height: 3,
-  },
-  metrics: {
-    flexDirection: 'row',
-    gap: 28,
-  },
-  metric: {
-    flex: 1,
-    gap: 8,
-  },
-  metricValue: {
+  titleText: {
     color: colors.foreground,
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 0,
-    lineHeight: 25,
-    opacity: opacity.primary,
-  },
-  metadata: {
-    color: colors.foreground,
-    fontSize: 13,
-    letterSpacing: 0,
-    lineHeight: 18,
-    opacity: opacity.muted,
-  },
-  sheet: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  sheetContent: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sheetX,
-  },
-  sheetTitle: {
-    color: colors.foreground,
-    fontSize: 20,
+    fontSize: typeScale.title,
     fontWeight: '600',
     letterSpacing: 0,
     lineHeight: 26,
-    opacity: opacity.primary,
-    textAlign: 'center',
+    opacity: opacity.title,
   },
-  sheetMeta: {
+  bodyText: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+  },
+  metadataText: {
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+  },
+  monoMeta: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+  },
+  indexText: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.index,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.metadata,
+    width: 40,
+  },
+  activeText: {
+    opacity: opacity.title,
+  },
+  disabledText: {
+    opacity: opacity.disabled,
+  },
+  successText: {
+    color: colors.success,
+    opacity: opacity.title,
+  },
+  dayList: {
+    gap: 24,
+    paddingTop: 64,
+  },
+  dayRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  dayCopy: {
+    alignItems: 'baseline',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dayTitle: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.metadata,
+  },
+  dayDetail: {
     color: colors.foreground,
     fontSize: 14,
     letterSpacing: 0,
     lineHeight: 20,
-    marginTop: 8,
-    opacity: opacity.muted,
-    textAlign: 'center',
+    opacity: opacity.disabled,
   },
-  exerciseList: {
-    gap: 24,
-    marginTop: 52,
-  },
-  exerciseRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 18,
-  },
-  exerciseCopy: {
-    flex: 1,
-    gap: 6,
-  },
-  exerciseName: {
+  dayTime: {
     color: colors.foreground,
-    fontSize: 17,
+    fontFamily: typography.mono,
+    fontSize: typeScale.metadata,
     letterSpacing: 0,
-    lineHeight: 23,
-    opacity: opacity.primary,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+    textAlign: 'right',
+    width: 52,
   },
-  sheetActions: {
+  nudgeLine: {
+    gap: 4,
+    marginTop: 42,
+  },
+  exerciseSurface: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 120,
+  },
+  exerciseTitle: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 26,
+    opacity: opacity.title,
+  },
+  setList: {
+    gap: 16,
+    marginTop: 32,
+  },
+  setRow: {
     alignItems: 'center',
     flexDirection: 'row',
+  },
+  setValue: {
+    color: colors.foreground,
+    flex: 1,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+  },
+  setNow: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+    textAlign: 'right',
+    width: 52,
+  },
+  restSurface: {
+    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    gap: 10,
-    marginTop: 54,
+    paddingBottom: 84,
+  },
+  restTimer: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.countdown,
+    fontWeight: '300',
+    letterSpacing: 0,
+    lineHeight: 68,
+    marginTop: 22,
+    opacity: opacity.title,
+  },
+  restTicks: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 28,
+  },
+  restTick: {
+    backgroundColor: colors.foreground,
+    height: 2,
+    opacity: opacity.hint,
+    width: 28,
+  },
+  restTickActive: {
+    backgroundColor: colors.foreground,
+    height: 2,
+    opacity: opacity.enabled,
+    width: 28,
+  },
+  nextBlock: {
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 56,
+  },
+  voiceSurface: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 80,
+  },
+  listeningRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 54,
+  },
+  listeningDot: {
+    backgroundColor: colors.foreground,
+    borderRadius: 5,
+    height: 10,
+    opacity: opacity.body,
+    width: 10,
+  },
+  voiceText: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 29,
+    marginBottom: 44,
+    opacity: opacity.title,
+    textAlign: 'center',
+  },
+  actionText: {
+    fontSize: typeScale.action,
+    letterSpacing: 0,
+    lineHeight: 24,
+  },
+  bottomActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });
