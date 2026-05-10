@@ -29,6 +29,7 @@ import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
 import {
   addWorkoutOutcome,
   createInitialAppState,
+  hasCompletedWorkout,
   upsertExerciseWeight,
 } from './src/data/appState';
 import type { AppState } from './src/data/appState';
@@ -422,7 +423,8 @@ function WorkoutSurface({
   session,
   visible,
   onAddRest,
-  onClose,
+  onBack,
+  onFinishWorkout,
   onLogSet,
   onSelectExercise,
   onSkipRest,
@@ -430,7 +432,8 @@ function WorkoutSurface({
   session: WorkoutSession;
   visible: boolean;
   onAddRest: () => void;
-  onClose: () => void;
+  onBack: () => void;
+  onFinishWorkout: () => void;
   onLogSet: () => void;
   onSelectExercise: (index: number) => void;
   onSkipRest: () => void;
@@ -598,7 +601,8 @@ function WorkoutSurface({
               </>
             ) : mode === 'overview' ? (
               <>
-                <ActionText onPress={onClose}>end</ActionText>
+                <ActionText onPress={onBack}>back</ActionText>
+                <ActionText onPress={onFinishWorkout}>finish workout</ActionText>
               </>
             ) : (
               <>
@@ -627,6 +631,7 @@ function Home() {
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
+  const workoutComplete = hasCompletedWorkout(appState, workoutPlan.id);
   const calendarMonth = createCalendarMonth(appState.dailyOutcomes, today.date, visibleMonthDate);
   const selectedOutcome = appState.dailyOutcomes.find((outcome) => outcome.date === selectedDate);
   const recommendation = chooseRecommendation({
@@ -637,14 +642,17 @@ function Home() {
     weather: today.weather,
     workout: {
       planned: true,
-      completed: false,
+      completed: workoutComplete,
       name: today.workout,
     },
   });
+  const openItems = workoutComplete
+    ? remainingItems.filter((item) => item.title !== today.workout)
+    : remainingItems;
   const homeMiddle = chooseHomeMiddle({
     minutesWorked: today.focusMinutes,
     recommendation,
-    remainingItems,
+    remainingItems: openItems,
   });
 
   useEffect(() => {
@@ -674,7 +682,10 @@ function Home() {
   const selectWorkoutExercise = (index: number) => {
     setWorkoutSession((session) => selectExercise(session, workoutPlan, index));
   };
-  const endWorkout = () => {
+  const closeWorkout = () => {
+    setWorkoutVisible(false);
+  };
+  const finishWorkout = () => {
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
 
     setAppState((state) => {
@@ -751,7 +762,8 @@ function Home() {
         session={workoutSession}
         visible={workoutVisible}
         onAddRest={() => setWorkoutSession((session) => addRestTime(session, 30))}
-        onClose={endWorkout}
+        onBack={closeWorkout}
+        onFinishWorkout={finishWorkout}
         onLogSet={logWorkoutSet}
         onSelectExercise={selectWorkoutExercise}
         onSkipRest={() => setWorkoutSession((session) => skipRest(session))}
