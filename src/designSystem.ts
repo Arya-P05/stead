@@ -8,9 +8,15 @@ export const colors = {
 };
 
 export const opacity = {
-  primary: 0.88,
+  title: 0.92,
+  body: 0.78,
+  enabled: 0.52,
+  metadata: 0.36,
+  disabled: 0.22,
+  hint: 0.1,
+  primary: 0.92,
   secondary: 0.52,
-  muted: 0.34,
+  muted: 0.36,
   unavailable: 0.22,
 };
 
@@ -21,4 +27,13 @@ export const spacing = {
 
 export const typography = {
   mono: Platform.select({ ios: 'SF Mono', default: 'monospace' }),
+};
+
+export const typeScale = {
+  title: 20,
+  body: 17,
+  action: 16,
+  metadata: 13,
+  index: 12,
+  countdown: 56,
 };
