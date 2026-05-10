@@ -28,6 +28,7 @@ import {
 import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
 import {
   addWorkoutOutcome,
+  addStepSample,
   clearActiveWorkoutSession,
   createInitialAppState,
   hasCompletedWorkout,
@@ -40,6 +41,8 @@ import { createWorkoutOutcome } from './src/data/workoutOutcome';
 import { createCalendarMonth } from './src/data/calendarDays';
 import type { CalendarMonth } from './src/data/calendarDays';
 import { scheduleRecommendationNudge } from './src/services/notifications';
+import { syncTodaySteps } from './src/services/healthkit';
+import { healthKitAdapter } from './src/services/healthkitNative';
 
 const today = {
   date: '2026-05-09',
@@ -681,6 +684,18 @@ function Home() {
       saveAppState(undefined, appState);
     }
   }, [appState, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    void syncTodaySteps(healthKitAdapter).then((sample) => {
+      if (sample) {
+        setAppState((state) => addStepSample(state, sample));
+      }
+    });
+  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated || recommendation.type === 'steady') {
