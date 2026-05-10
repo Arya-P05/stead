@@ -29,6 +29,7 @@ import {
 } from './src/domain/workoutSession';
 import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
 import {
+  addDailyOutcome,
   addWorkoutOutcome,
   addStepSample,
   clearActiveWorkoutSession,
@@ -49,9 +50,9 @@ import { createDefaultWorkoutPlan, updateExercise } from './src/data/workoutPlan
 import { applyWorkoutVoiceLog, parseWorkoutVoiceLog } from './src/domain/voiceLog';
 
 const today = {
-  date: '2026-05-09',
-  dateLabel: 'saturday',
-  dateMeta: 'may 9',
+  date: formatDateKey(new Date()),
+  dateLabel: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
+  dateMeta: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toLowerCase(),
   stepGoal: 10000,
   focusMinutes: 154,
   workout: 'push day',
@@ -62,6 +63,18 @@ const today = {
     precipitationChance: 0.05,
   },
 };
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatTimestampDate(timestamp: number) {
+  return formatDateKey(new Date(timestamp));
+}
 
 type DayItem = {
   title: string;
@@ -200,12 +213,14 @@ function DaySurface({
   onWorkout,
   selectedDate,
   selectedOutcome,
+  selectedWorkoutOutcome,
 }: {
   loggedSets: number;
   onBack: () => void;
   onWorkout: () => void;
   selectedDate: string;
   selectedOutcome?: AppState['dailyOutcomes'][number];
+  selectedWorkoutOutcome?: AppState['workoutOutcomes'][number];
 }) {
   const isToday = selectedDate === today.date;
 
@@ -222,19 +237,44 @@ function DaySurface({
                 : 'no tracked outcome'}
           </Text>
         </View>
-        <Text style={styles.monoMeta}>{loggedSets > 0 ? `${loggedSets} / 17` : '5 / 7'}</Text>
+        <Text style={styles.monoMeta}>
+          {selectedWorkoutOutcome ? `${selectedWorkoutOutcome.totalSets} sets` : loggedSets > 0 ? `${loggedSets} logged` : '5 / 7'}
+        </Text>
       </View>
 
-      <View style={styles.dayList}>
-        {dayItems.map((item, index) => (
-          <DayRow
-            key={`${item.title}-${index}`}
-            index={index}
-            item={item}
-            onWorkout={onWorkout}
-          />
-        ))}
-      </View>
+      {selectedWorkoutOutcome ? (
+        <View style={styles.dayList}>
+          <View style={styles.nudgeLine}>
+            <Text style={styles.exerciseTitle}>{selectedWorkoutOutcome.name}</Text>
+            <Text style={styles.monoMeta}>
+              {Math.round((selectedWorkoutOutcome.completedAt - selectedWorkoutOutcome.startedAt) / 60000)} min ·{' '}
+              {selectedWorkoutOutcome.exercises.length} lifts · {selectedWorkoutOutcome.totalSets} sets
+            </Text>
+          </View>
+          {selectedWorkoutOutcome.exercises.map((exercise, index) => (
+            <View key={exercise.exerciseId} style={styles.dayRow}>
+              <IndexText>{String(index + 1).padStart(2, '0')}</IndexText>
+              <View style={styles.dayCopy}>
+                <Text style={[styles.dayTitle, styles.activeText]}>{exercise.name}</Text>
+              </View>
+              <Text style={styles.recapSetValue}>
+                {exercise.sets} × {exercise.reps ?? '-'}{exercise.weightLb ? ` · ${exercise.weightLb}` : ''}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.dayList}>
+          {dayItems.map((item, index) => (
+            <DayRow
+              key={`${item.title}-${index}`}
+              index={index}
+              item={item}
+              onWorkout={onWorkout}
+            />
+          ))}
+        </View>
+      )}
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
@@ -707,6 +747,9 @@ function Home() {
   const workoutComplete = hasCompletedWorkout(appState, workoutPlan.id);
   const calendarMonth = createCalendarMonth(appState.dailyOutcomes, today.date, visibleMonthDate);
   const selectedOutcome = appState.dailyOutcomes.find((outcome) => outcome.date === selectedDate);
+  const selectedWorkoutOutcome = appState.workoutOutcomes.find(
+    (outcome) => formatTimestampDate(outcome.completedAt) === selectedDate,
+  );
   const recommendation = chooseRecommendation({
     steps: latestSteps,
     stepGoal: today.stepGoal,
@@ -817,6 +860,14 @@ function Home() {
 
     setAppState((state) => {
       const withWorkout = addWorkoutOutcome(state, outcome);
+      const withDailyOutcome = addDailyOutcome(withWorkout, {
+        date: today.date,
+        completedItems: 6,
+        plannedItems: 7,
+        steps: latestSteps,
+        focusMinutes: today.focusMinutes,
+        note: `${outcome.name} logged`,
+      });
       const withWeights = outcome.exercises.reduce(
         (nextState, exercise) =>
           exercise.weightLb === undefined
@@ -826,7 +877,7 @@ function Home() {
                 weightLb: exercise.weightLb,
                 updatedAt: outcome.completedAt,
               }),
-        withWorkout,
+        withDailyOutcome,
       );
 
       return clearActiveWorkoutSession(withWeights);
@@ -891,6 +942,7 @@ function Home() {
             onWorkout={() => setWorkoutVisible(true)}
             selectedDate={selectedDate}
             selectedOutcome={selectedOutcome}
+            selectedWorkoutOutcome={selectedWorkoutOutcome}
           />
         )}
       </Animated.View>
@@ -1246,6 +1298,16 @@ const styles = StyleSheet.create({
     opacity: opacity.metadata,
     textAlign: 'right',
     width: 52,
+  },
+  recapSetValue: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+    textAlign: 'right',
+    width: 92,
   },
   nudgeLine: {
     gap: 4,
