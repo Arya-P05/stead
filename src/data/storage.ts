@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createInitialAppState } from './appState';
 import type { AppState } from './appState';
+import { normalizeWorkoutPlan } from './workoutPlan';
 
 export type StorageAdapter = {
   getItem: (key: string) => Promise<string | null>;
@@ -27,6 +28,7 @@ export async function loadAppState(storage: StorageAdapter = appStorage): Promis
     return {
       ...createInitialAppState(),
       ...parsed,
+      workoutPlan: normalizeWorkoutPlan(parsed.workoutPlan),
     };
   } catch {
     return createInitialAppState();

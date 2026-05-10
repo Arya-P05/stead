@@ -44,9 +44,8 @@ import { loadAppState, saveAppState } from './src/data/storage';
 import { createWorkoutOutcome } from './src/data/workoutOutcome';
 import { createCalendarMonth } from './src/data/calendarDays';
 import type { CalendarMonth } from './src/data/calendarDays';
-import { scheduleRecommendationNudge } from './src/services/notifications';
 import { syncTodaySteps } from './src/services/healthkit';
-import { createDefaultWorkoutPlan, updateExercise } from './src/data/workoutPlan';
+import { createDefaultWorkoutPlan, normalizeWorkoutPlan, updateExercise } from './src/data/workoutPlan';
 import { applyWorkoutVoiceLog, parseWorkoutVoiceLog } from './src/domain/voiceLog';
 
 const today = {
@@ -801,11 +800,7 @@ function Home() {
     }
   }, [appState, hydrated]);
 
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-
+  const syncHealthSteps = () => {
     void import('./src/services/healthkitNative')
       .then(({ healthKitAdapter }) => syncTodaySteps(healthKitAdapter))
       .then((sample) => {
@@ -814,20 +809,7 @@ function Home() {
         }
       })
       .catch(() => undefined);
-  }, [hydrated]);
-
-  useEffect(() => {
-    if (!hydrated || recommendation.type === 'steady') {
-      return;
-    }
-
-    void scheduleRecommendationNudge(undefined, {
-      identifier: 'stead-next-action',
-      title: recommendation.action,
-      body: recommendation.reason,
-      secondsFromNow: 60 * 30,
-    });
-  }, [hydrated, recommendation.action, recommendation.reason, recommendation.type]);
+  };
 
   const logWorkoutSet = () => {
     setWorkoutSession((session) => {
@@ -910,7 +892,7 @@ function Home() {
     setAppState((state) =>
       saveWorkoutPlan(
         state,
-        updateExercise(state.workoutPlan ?? createDefaultWorkoutPlan(), exerciseId, patch),
+        updateExercise(normalizeWorkoutPlan(state.workoutPlan), exerciseId, patch),
       ),
     );
   };
@@ -939,9 +921,11 @@ function Home() {
             <View style={styles.progressBlock}>
               <View style={styles.progressHeader}>
                 <Text style={styles.indexText}>steps</Text>
-                <Text style={styles.monoMeta}>
-                  {latestSteps > 0 ? `${latestSteps.toLocaleString()} / 10,000` : 'healthkit pending'}
-                </Text>
+                {latestSteps > 0 ? (
+                  <Text style={styles.monoMeta}>{latestSteps.toLocaleString()} / 10,000</Text>
+                ) : (
+                  <ActionText onPress={syncHealthSteps}>connect</ActionText>
+                )}
               </View>
               <View style={styles.progressTrack}>
                 <AnimatedProgressFill progress={stepProgress} style={styles.progressFill} />

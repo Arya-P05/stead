@@ -1,4 +1,4 @@
-import { createDefaultWorkoutPlan, updateExercise } from './workoutPlan';
+import { createDefaultWorkoutPlan, normalizeWorkoutPlan, updateExercise } from './workoutPlan';
 
 describe('workout plan', () => {
   it('creates the default push day plan', () => {
@@ -43,5 +43,22 @@ describe('workout plan', () => {
       restSeconds: 15,
       weightLb: 0,
     });
+  });
+
+  it('repairs incomplete stored plans', () => {
+    const normalized = normalizeWorkoutPlan({
+      id: 'push-day',
+      name: '',
+      exercises: [
+        {
+          id: 'incline-db-press',
+          name: '',
+          targetSets: 0,
+          restSeconds: 0,
+        },
+      ],
+    });
+
+    expect(normalized).toEqual(createDefaultWorkoutPlan());
   });
 });

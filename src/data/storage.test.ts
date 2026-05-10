@@ -53,6 +53,21 @@ describe('storage', () => {
     await expect(loadAppState(storage)).resolves.toEqual(createInitialAppState());
   });
 
+  it('repairs a broken saved workout plan', async () => {
+    const storage = createMemoryStorage({
+      'stead.app-state': JSON.stringify({
+        ...createInitialAppState(),
+        workoutPlan: {
+          id: 'push-day',
+          name: '',
+          exercises: [{ id: 'incline-db-press', name: '', targetSets: 0, restSeconds: 0 }],
+        },
+      }),
+    });
+
+    await expect(loadAppState(storage)).resolves.toEqual(createInitialAppState());
+  });
+
   it('saves and reloads app state', async () => {
     const storage = createMemoryStorage();
     const state = {

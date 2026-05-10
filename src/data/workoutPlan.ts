@@ -49,6 +49,36 @@ export function createDefaultWorkoutPlan(): WorkoutPlan {
   };
 }
 
+export function normalizeWorkoutPlan(plan: Partial<WorkoutPlan> | null | undefined): WorkoutPlan {
+  const defaultPlan = createDefaultWorkoutPlan();
+
+  if (!plan || !Array.isArray(plan.exercises) || plan.exercises.length === 0) {
+    return defaultPlan;
+  }
+
+  return {
+    id: typeof plan.id === 'string' && plan.id.length > 0 ? plan.id : defaultPlan.id,
+    name: typeof plan.name === 'string' && plan.name.length > 0 ? plan.name : defaultPlan.name,
+    exercises: defaultPlan.exercises.map((defaultExercise, index) => {
+      const stored = plan.exercises?.find((exercise) => exercise?.id === defaultExercise.id) ??
+        plan.exercises?.[index];
+
+      if (!stored || typeof stored.name !== 'string' || stored.name.length === 0) {
+        return defaultExercise;
+      }
+
+      return {
+        id: typeof stored.id === 'string' && stored.id.length > 0 ? stored.id : defaultExercise.id,
+        name: stored.name,
+        targetSets: clampInt(stored.targetSets ?? defaultExercise.targetSets, 1),
+        targetReps: clampInt(stored.targetReps ?? defaultExercise.targetReps ?? 1, 1),
+        restSeconds: clampInt(stored.restSeconds ?? defaultExercise.restSeconds, 15),
+        weightLb: clampInt(stored.weightLb ?? defaultExercise.weightLb ?? 0, 0),
+      };
+    }),
+  };
+}
+
 export function updateExercise(
   plan: WorkoutPlan,
   exerciseId: string,
