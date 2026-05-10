@@ -15,7 +15,8 @@ stead is meant to become a quiet personal EA: it knows your day, your goals, you
 - Living design-system doc at `docs/design-system.md`.
 - Product plan at `docs/plan.md`.
 - Home surface with next action, step progress, focus state, and workout entry.
-- Workout sheet with compact routine rows.
+- Tested recommendation engine for the next action.
+- Workout sheet with real set logging, exercise progress, and rest countdown copy.
 - Haptic and visual feedback for text actions.
 
 ## run
@@ -35,4 +36,5 @@ npm start
 
 ```sh
 npm run typecheck
+npm test
 ```
