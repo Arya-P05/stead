@@ -1,17 +1,19 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Modal,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors, opacity, spacing, typeScale, typography } from './src/designSystem';
+import { AnimatedProgressFill, PressableScale, PulsingDot } from './src/ui/motion';
+import { useSequentialCrossfade } from './src/ui/sequentialCrossfade';
 import { chooseRecommendation } from './src/domain/recommendations';
 import { chooseHomeMiddle } from './src/domain/homeMiddle';
 import type { HomeMiddle } from './src/domain/homeMiddle';
@@ -42,7 +44,6 @@ import { createCalendarMonth } from './src/data/calendarDays';
 import type { CalendarMonth } from './src/data/calendarDays';
 import { scheduleRecommendationNudge } from './src/services/notifications';
 import { syncTodaySteps } from './src/services/healthkit';
-import { healthKitAdapter } from './src/services/healthkitNative';
 
 const today = {
   date: '2026-05-09',
@@ -134,6 +135,14 @@ type FeedbackState = 'idle' | 'success' | 'warning';
 type WorkoutMode = 'overview' | 'exercise' | 'voice';
 type Surface = 'home' | 'calendar' | 'day';
 
+function parseWorkoutVisualKey(key: string): { mode: WorkoutMode; isResting: boolean } {
+  if (key.endsWith('-true')) {
+    return { mode: key.slice(0, -5) as WorkoutMode, isResting: true };
+  }
+
+  return { mode: key.slice(0, -6) as WorkoutMode, isResting: false };
+}
+
 function ActionText({
   children,
   disabled,
@@ -145,8 +154,11 @@ function ActionText({
   tone?: Exclude<FeedbackState, 'idle'>;
   onPress: () => void;
 }) {
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useSharedValue(0);
   const [feedback, setFeedback] = useState<FeedbackState>('idle');
+  const liftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const runFeedback = async () => {
     if (disabled) {
@@ -158,18 +170,10 @@ function ActionText({
       onPress();
     }
 
-    Animated.sequence([
-      Animated.timing(translateY, {
-        toValue: -1,
-        duration: 90,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 140,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    translateY.value = withSequence(
+      withTiming(-1, { duration: 90 }),
+      withTiming(0, { duration: 150, easing: Easing.out(Easing.cubic) }),
+    );
 
     setTimeout(() => setFeedback('idle'), 480);
   };
@@ -186,10 +190,10 @@ function ActionText({
       <Animated.Text
         style={[
           styles.actionText,
+          liftStyle,
           {
             color,
             opacity: disabled ? opacity.disabled : opacity.enabled,
-            transform: [{ translateY }],
           },
         ]}
       >
@@ -225,9 +229,9 @@ function DayRow({
 
   if (item.action === 'workout') {
     return (
-      <Pressable onPress={onWorkout} hitSlop={8}>
+      <PressableScale onPress={onWorkout} hitSlop={8}>
         {row}
-      </Pressable>
+      </PressableScale>
     );
   }
 
@@ -252,7 +256,7 @@ function DaySurface({
   return (
     <View style={styles.calendarContent}>
       <View style={styles.dayHeader}>
-        <View>
+        <View style={styles.titleStack}>
           <Text style={styles.titleText}>{isToday ? today.dateLabel : selectedDate.slice(5)}</Text>
           <Text style={styles.metadataText}>
             {selectedOutcome
@@ -300,7 +304,7 @@ function CalendarSurface({
   return (
     <View style={styles.content}>
       <View style={styles.dayHeader}>
-        <View>
+        <View style={styles.titleStack}>
           <Text style={styles.titleText}>{month.label}</Text>
           <Text style={styles.metadataText}>{month.meta}</Text>
         </View>
@@ -309,9 +313,9 @@ function CalendarSurface({
       <View style={styles.calendarSurface}>
         <View style={styles.weekdays}>
           {['s', 'm', 't', 'w', 't', 'f', 's'].map((weekday, index) => (
-            <Text key={`${weekday}-${index}`} style={styles.weekdayLabel}>
-              {weekday}
-            </Text>
+            <View key={`${weekday}-${index}`}>
+              <Text style={styles.weekdayLabel}>{weekday}</Text>
+            </View>
           ))}
         </View>
         <View style={styles.monthGrid}>
@@ -321,21 +325,24 @@ function CalendarSurface({
                 day === null ? (
                   <View key={`empty-${dayIndex}`} style={styles.calendarCell} />
                 ) : (
-                  <Pressable
+                  <PressableScale
                     key={day.date}
+                    layout="fill"
                     disabled={!day.selectable}
                     onPress={() => onSelectDate(day.date)}
                     style={styles.calendarCell}
                   >
-                    <Text
-                      style={[
-                        styles.calendarLabel,
-                        (!day.tracked || day.future) && styles.untrackedText,
-                      ]}
-                    >
-                      {day.label}
-                    </Text>
-                  </Pressable>
+                    <View>
+                      <Text
+                        style={[
+                          styles.calendarLabel,
+                          (!day.tracked || day.future) && styles.untrackedText,
+                        ]}
+                      >
+                        {day.label}
+                      </Text>
+                    </View>
+                  </PressableScale>
                 ),
               )}
             </View>
@@ -386,9 +393,9 @@ function HomeMiddleSurface({
         <Text style={styles.homeMeta}>{middle.label}</Text>
         <Text style={styles.nextTitle}>{middle.title}</Text>
         <Text style={styles.homeMeta}>{middle.meta}</Text>
-        <Pressable onPress={onWorkout} hitSlop={12}>
+        <PressableScale onPress={onWorkout} hitSlop={12}>
           <Text style={styles.nextStart}>{middle.action}</Text>
-        </Pressable>
+        </PressableScale>
         <Text style={styles.supporting}>{middle.detail}</Text>
       </View>
     );
@@ -480,11 +487,21 @@ function WorkoutSurface({
     ? `${activeExercise.targetSets} × ${activeExercise.targetReps ?? 10} · ${activeExercise.weightLb ?? 50} lb`
     : `${session.sets.length} sets logged`;
 
+  const workoutVisualKey = `${mode}-${isResting}`;
+  const { displayKey: workoutStageShown, animatedStyle: workoutStageOpacity } = useSequentialCrossfade(
+    workoutVisualKey,
+    { fadeOutMs: 220, fadeInMs: 360 },
+  );
+  const stageView = parseWorkoutVisualKey(workoutStageShown);
+
   return (
-    <Modal animationType="slide" visible={visible} presentationStyle="fullScreen">
+    <Modal animationType="fade" visible={visible} presentationStyle="fullScreen">
       <SafeAreaView style={styles.screen}>
         <StatusBar style="light" />
-        <View style={styles.liveContent}>
+        <Animated.View
+          entering={FadeIn.duration(420).easing(Easing.out(Easing.cubic))}
+          style={styles.liveContent}
+        >
           <View style={styles.liveHeader}>
             <Text style={styles.metadataText}>
               {workoutPlan.name}
@@ -495,103 +512,107 @@ function WorkoutSurface({
             </Text>
           </View>
 
-          {mode === 'overview' ? (
-            <View style={styles.workoutOverview}>
-              <Text style={styles.metadataText}>
-                {session.sets.length} of {workoutPlan.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0)} sets
-              </Text>
-              <View style={styles.workoutExerciseList}>
-                {workoutPlan.exercises.map((exercise, index) => {
-                  const progress = exerciseProgress[index];
+          <Animated.View style={[styles.workoutStage, workoutStageOpacity]}>
+            {stageView.mode === 'overview' ? (
+              <View style={styles.workoutOverview}>
+                <Text style={styles.metadataText}>
+                  {session.sets.length} of {workoutPlan.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0)} sets
+                </Text>
+                <View style={styles.workoutExerciseList}>
+                  {workoutPlan.exercises.map((exercise, index) => {
+                    const progress = exerciseProgress[index];
 
-                  return (
-                    <Pressable
-                      key={exercise.id}
-                      disabled={progress.complete}
-                      onPress={() => {
-                        onSelectExercise(index);
-                        setMode('exercise');
-                      }}
-                      style={styles.workoutExerciseRow}
-                    >
-                      <IndexText active={!progress.complete && index === session.activeExerciseIndex}>
-                        {String(index + 1).padStart(2, '0')}
-                      </IndexText>
-                      <View style={styles.workoutExerciseCopy}>
-                        <Text
-                          style={[
-                            styles.workoutExerciseName,
-                            progress.complete && styles.untrackedText,
-                          ]}
+                    return (
+                      <View key={exercise.id}>
+                        <PressableScale
+                          disabled={progress.complete}
+                          onPress={() => {
+                            onSelectExercise(index);
+                            setMode('exercise');
+                          }}
+                          style={styles.workoutExerciseRow}
                         >
-                          {exercise.name}
+                          <IndexText active={!progress.complete && index === session.activeExerciseIndex}>
+                            {String(index + 1).padStart(2, '0')}
+                          </IndexText>
+                          <View style={styles.workoutExerciseCopy}>
+                            <Text
+                              style={[
+                                styles.workoutExerciseName,
+                                progress.complete && styles.untrackedText,
+                              ]}
+                            >
+                              {exercise.name}
+                            </Text>
+                            <Text style={styles.monoMeta}>
+                              {progress.completedSets}/{exercise.targetSets} sets · {exercise.targetReps ?? 10} reps ·{' '}
+                              {exercise.weightLb ?? 50} lb
+                            </Text>
+                          </View>
+                          <Text style={[styles.setNow, progress.complete && styles.successText]}>
+                            {progress.complete ? 'done' : ''}
+                          </Text>
+                        </PressableScale>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : stageView.mode === 'voice' ? (
+              <View style={styles.voiceSurface}>
+                <View style={styles.listeningRow}>
+                  <PulsingDot style={styles.listeningDot} />
+                  <Text style={styles.bodyText}>listening</Text>
+                </View>
+                <Text style={styles.voiceText}>three sets of forty{'\n'}on incline dumbbell press</Text>
+                <Text style={styles.metadataText}>captured · ready to log</Text>
+              </View>
+            ) : stageView.isResting ? (
+              <View style={styles.restSurface}>
+                <Text style={styles.metadataText}>rest</Text>
+                <FormatTimer seconds={restSeconds} />
+                <View style={styles.restTicks}>
+                  <View style={styles.restTickActive} />
+                  <View style={styles.restTickActive} />
+                  <View style={styles.restTick} />
+                  <View style={styles.restTick} />
+                </View>
+                <View style={styles.nextBlock}>
+                  <Text style={styles.metadataText}>next</Text>
+                  <Text style={styles.bodyText}>{activeExercise?.name}</Text>
+                  <Text style={styles.monoMeta}>{targetLine}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.exerciseSurface}>
+                <View>
+                  <Text style={styles.exerciseTitle}>{activeExercise?.name ?? 'workout complete'}</Text>
+                  <Text style={styles.monoMeta}>{targetLine}</Text>
+                </View>
+
+                <View style={styles.setList}>
+                  {Array.from({ length: activeExercise?.targetSets ?? 0 }).map((_, index) => {
+                    const complete = index < completedSets;
+                    const current = index === completedSets;
+
+                    return (
+                      <View key={index} style={styles.setRow}>
+                        <IndexText active={current}>{String(index + 1).padStart(2, '0')}</IndexText>
+                        <Text style={[styles.setValue, !complete && !current && styles.disabledText]}>
+                          {complete || current
+                            ? `${activeExercise?.targetReps ?? 10} reps · ${activeExercise?.weightLb ?? 50} lb`
+                            : '- reps · - lb'}
                         </Text>
-                        <Text style={styles.monoMeta}>
-                          {progress.completedSets}/{exercise.targetSets} sets · {exercise.targetReps ?? 10} reps · {exercise.weightLb ?? 50} lb
+                        <Text style={[styles.setNow, current && styles.successText]}>
+                          {current ? 'now' : complete ? '-' : ''}
                         </Text>
                       </View>
-                      <Text style={[styles.setNow, progress.complete && styles.successText]}>
-                        {progress.complete ? 'done' : ''}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                    );
+                  })}
+                </View>
               </View>
-            </View>
-          ) : mode === 'voice' ? (
-            <View style={styles.voiceSurface}>
-              <View style={styles.listeningRow}>
-                <View style={styles.listeningDot} />
-                <Text style={styles.bodyText}>listening</Text>
-              </View>
-              <Text style={styles.voiceText}>three sets of forty{'\n'}on incline dumbbell press</Text>
-              <Text style={styles.metadataText}>captured · ready to log</Text>
-            </View>
-          ) : isResting ? (
-            <View style={styles.restSurface}>
-              <Text style={styles.metadataText}>rest</Text>
-              <FormatTimer seconds={restSeconds} />
-              <View style={styles.restTicks}>
-                <View style={styles.restTickActive} />
-                <View style={styles.restTickActive} />
-                <View style={styles.restTick} />
-                <View style={styles.restTick} />
-              </View>
-              <View style={styles.nextBlock}>
-                <Text style={styles.metadataText}>next</Text>
-                <Text style={styles.bodyText}>{activeExercise?.name}</Text>
-                <Text style={styles.monoMeta}>{targetLine}</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.exerciseSurface}>
-              <View>
-                <Text style={styles.exerciseTitle}>{activeExercise?.name ?? 'workout complete'}</Text>
-                <Text style={styles.monoMeta}>{targetLine}</Text>
-              </View>
-
-              <View style={styles.setList}>
-                {Array.from({ length: activeExercise?.targetSets ?? 0 }).map((_, index) => {
-                  const complete = index < completedSets;
-                  const current = index === completedSets;
-
-                  return (
-                    <View key={index} style={styles.setRow}>
-                      <IndexText active={current}>{String(index + 1).padStart(2, '0')}</IndexText>
-                      <Text style={[styles.setValue, !complete && !current && styles.disabledText]}>
-                        {complete || current
-                          ? `${activeExercise?.targetReps ?? 10} reps · ${activeExercise?.weightLb ?? 50} lb`
-                          : '- reps · - lb'}
-                      </Text>
-                      <Text style={[styles.setNow, current && styles.successText]}>
-                        {current ? 'now' : complete ? '-' : ''}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
+            )}
+          </Animated.View>
 
           <View style={styles.bottomActions}>
             {mode === 'voice' ? (
@@ -618,7 +639,7 @@ function WorkoutSurface({
               </>
             )}
           </View>
-        </View>
+        </Animated.View>
       </SafeAreaView>
     </Modal>
   );
@@ -627,7 +648,11 @@ function WorkoutSurface({
 function Home() {
   const [appState, setAppState] = useState<AppState>(() => createInitialAppState());
   const [hydrated, setHydrated] = useState(false);
-  const [surface, setSurface] = useState<Surface>('home');
+  const [surface, setSurfaceState] = useState<Surface>('home');
+  const { displayKey: surfaceShown, animatedStyle: surfaceOpacityStyle } = useSequentialCrossfade(surface, {
+    fadeOutMs: 280,
+    fadeInMs: 420,
+  });
   const [selectedDate, setSelectedDate] = useState(today.date);
   const [visibleMonthDate, setVisibleMonthDate] = useState(today.date);
   const [workoutVisible, setWorkoutVisible] = useState(false);
@@ -690,11 +715,14 @@ function Home() {
       return;
     }
 
-    void syncTodaySteps(healthKitAdapter).then((sample) => {
-      if (sample) {
-        setAppState((state) => addStepSample(state, sample));
-      }
-    });
+    void import('./src/services/healthkitNative')
+      .then(({ healthKitAdapter }) => syncTodaySteps(healthKitAdapter))
+      .then((sample) => {
+        if (sample) {
+          setAppState((state) => addStepSample(state, sample));
+        }
+      })
+      .catch(() => undefined);
   }, [hydrated]);
 
   useEffect(() => {
@@ -757,54 +785,56 @@ function Home() {
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
-      {surface === 'home' ? (
-        <View style={styles.homeContent}>
-          <View style={styles.homeHeader}>
-            <Text style={styles.brand}>stead</Text>
-            <Pressable onPress={() => setSurface('calendar')} hitSlop={10}>
-              <Text style={styles.metadataText}>
-                {today.dateLabel} · {today.dateMeta}
-              </Text>
-            </Pressable>
-          </View>
+      <Animated.View style={[styles.surfaceRoot, surfaceOpacityStyle]}>
+        {surfaceShown === 'home' ? (
+          <View style={styles.homeContent}>
+            <View style={styles.homeHeader}>
+              <Text style={styles.titleText}>stead</Text>
+              <PressableScale onPress={() => setSurfaceState('calendar')} hitSlop={10}>
+                <Text style={styles.metadataText}>
+                  {today.dateLabel} · {today.dateMeta}
+                </Text>
+              </PressableScale>
+            </View>
 
-          <HomeMiddleSurface
-            middle={homeMiddle}
-            onWorkout={() => setWorkoutVisible(true)}
+            <HomeMiddleSurface
+              middle={homeMiddle}
+              onWorkout={() => setWorkoutVisible(true)}
+            />
+
+            <View style={styles.progressBlock}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.indexText}>steps</Text>
+                <Text style={styles.monoMeta}>
+                  {latestSteps > 0 ? `${latestSteps.toLocaleString()} / 10,000` : 'healthkit pending'}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <AnimatedProgressFill progress={stepProgress} style={styles.progressFill} />
+              </View>
+            </View>
+          </View>
+        ) : surfaceShown === 'calendar' ? (
+          <CalendarSurface
+            month={calendarMonth}
+            onBack={() => setSurfaceState('home')}
+            onNextMonth={() => setVisibleMonthDate((date) => addMonths(date, 1))}
+            onPreviousMonth={() => setVisibleMonthDate((date) => addMonths(date, -1))}
+            onSelectDate={(date) => {
+              setSelectedDate(date);
+              setSurfaceState('day');
+            }}
           />
-
-          <View style={styles.progressBlock}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.indexText}>steps</Text>
-              <Text style={styles.monoMeta}>
-                {latestSteps > 0 ? `${latestSteps.toLocaleString()} / 10,000` : 'healthkit pending'}
-              </Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${stepProgress * 100}%` }]} />
-            </View>
-          </View>
-        </View>
-      ) : surface === 'calendar' ? (
-        <CalendarSurface
-          month={calendarMonth}
-          onBack={() => setSurface('home')}
-          onNextMonth={() => setVisibleMonthDate((date) => addMonths(date, 1))}
-          onPreviousMonth={() => setVisibleMonthDate((date) => addMonths(date, -1))}
-          onSelectDate={(date) => {
-            setSelectedDate(date);
-            setSurface('day');
-          }}
-        />
-      ) : (
-        <DaySurface
-          loggedSets={loggedSets}
-          onBack={() => setSurface('home')}
-          onWorkout={() => setWorkoutVisible(true)}
-          selectedDate={selectedDate}
-          selectedOutcome={selectedOutcome}
-        />
-      )}
+        ) : (
+          <DaySurface
+            loggedSets={loggedSets}
+            onBack={() => setSurfaceState('home')}
+            onWorkout={() => setWorkoutVisible(true)}
+            selectedDate={selectedDate}
+            selectedOutcome={selectedOutcome}
+          />
+        )}
+      </Animated.View>
 
       <WorkoutSurface
         session={workoutSession}
@@ -853,13 +883,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
-    paddingTop: 54,
+    paddingTop: spacing.screenTop,
   },
   calendarContent: {
     flex: 1,
     paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
-    paddingTop: 54,
+    paddingTop: spacing.screenTop,
   },
   liveContent: {
     flex: 1,
@@ -867,21 +897,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: 44,
   },
+  surfaceRoot: {
+    flex: 1,
+  },
   homeContent: {
     flex: 1,
     paddingBottom: 18,
     paddingHorizontal: spacing.screenX,
-    paddingTop: 18,
+    paddingTop: spacing.screenTop,
+  },
+  workoutStage: {
+    flex: 1,
   },
   homeHeader: {
     gap: 6,
   },
-  brand: {
-    color: colors.foreground,
-    fontSize: 24,
-    fontWeight: '600',
-    letterSpacing: 0,
-    opacity: opacity.title,
+  titleStack: {
+    gap: 6,
   },
   homeMiddle: {
     flex: 1,
