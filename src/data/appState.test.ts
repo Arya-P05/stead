@@ -3,6 +3,7 @@ import {
   addStepSample,
   addWorkoutOutcome,
   createInitialAppState,
+  hasCompletedWorkout,
   upsertExerciseWeight,
 } from './appState';
 
@@ -68,6 +69,21 @@ describe('app state', () => {
     });
 
     expect(second.workoutOutcomes.map((outcome) => outcome.id)).toEqual(['b', 'a']);
+  });
+
+  it('knows when a workout has been completed', () => {
+    const state = addWorkoutOutcome(createInitialAppState(), {
+      id: 'a',
+      planId: 'push-day',
+      name: 'push day',
+      startedAt: 1000,
+      completedAt: 2000,
+      totalSets: 17,
+      exercises: [],
+    });
+
+    expect(hasCompletedWorkout(state, 'push-day')).toBe(true);
+    expect(hasCompletedWorkout(state, 'pull-day')).toBe(false);
   });
 
   it('keeps the latest known weight per exercise', () => {

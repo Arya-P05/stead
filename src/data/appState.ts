@@ -75,6 +75,10 @@ export function addWorkoutOutcome(state: AppState, outcome: WorkoutOutcome): App
   };
 }
 
+export function hasCompletedWorkout(state: AppState, planId: string) {
+  return state.workoutOutcomes.some((outcome) => outcome.planId === planId);
+}
+
 export function upsertExerciseWeight(state: AppState, weight: ExerciseWeight): AppState {
   const current = state.exerciseWeights[weight.exerciseId];
 
