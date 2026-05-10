@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
   },
   homeContent: {
     flex: 1,
-    paddingBottom: 34,
+    paddingBottom: 18,
     paddingHorizontal: spacing.screenX,
     paddingTop: 18,
   },
@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
   },
   progressBlock: {
     gap: 12,
-    paddingBottom: 42,
+    paddingBottom: 10,
   },
   progressHeader: {
     alignItems: 'center',
