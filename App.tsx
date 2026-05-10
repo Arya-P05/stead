@@ -30,8 +30,8 @@ import {
 import type { AppState } from './src/data/appState';
 import { loadAppState, saveAppState } from './src/data/storage';
 import { createWorkoutOutcome } from './src/data/workoutOutcome';
-import { createCalendarDays } from './src/data/calendarDays';
-import type { CalendarDay } from './src/data/calendarDays';
+import { createCalendarMonth } from './src/data/calendarDays';
+import type { CalendarMonth } from './src/data/calendarDays';
 
 const today = {
   date: '2026-05-09',
@@ -268,11 +268,11 @@ function DaySurface({
 }
 
 function CalendarSurface({
-  days,
+  month,
   onBack,
   onSelectDate,
 }: {
-  days: CalendarDay[];
+  month: CalendarMonth;
   onBack: () => void;
   onSelectDate: (date: string) => void;
 }) {
@@ -280,31 +280,45 @@ function CalendarSurface({
     <View style={styles.content}>
       <View style={styles.dayHeader}>
         <View>
-          <Text style={styles.titleText}>calendar</Text>
+          <Text style={styles.titleText}>{month.label}</Text>
           <Text style={styles.metadataText}>tracked days are brighter</Text>
         </View>
       </View>
 
-      <View style={styles.calendarGrid}>
-        {days.map((day) => (
-          <Pressable
-            key={day.date}
-            disabled={!day.tracked}
-            onPress={() => onSelectDate(day.date)}
-            style={styles.calendarCell}
-          >
-            <Text style={[styles.calendarLabel, !day.tracked && styles.untrackedText]}>
-              {day.label}
+      <View style={styles.calendarSurface}>
+        <View style={styles.weekdays}>
+          {['s', 'm', 't', 'w', 't', 'f', 's'].map((weekday, index) => (
+            <Text key={`${weekday}-${index}`} style={styles.weekdayLabel}>
+              {weekday}
             </Text>
-            <Text style={[styles.calendarMeta, !day.tracked && styles.untrackedText]}>
-              {day.tracked ? 'tracked' : 'empty'}
-            </Text>
-          </Pressable>
-        ))}
+          ))}
+        </View>
+        <View style={styles.monthGrid}>
+          {month.weeks.map((week, weekIndex) => (
+            <View key={weekIndex} style={styles.weekRow}>
+              {week.map((day, dayIndex) =>
+                day === null ? (
+                  <View key={`empty-${dayIndex}`} style={styles.calendarCell} />
+                ) : (
+                  <Pressable
+                    key={day.date}
+                    disabled={!day.selectable}
+                    onPress={() => onSelectDate(day.date)}
+                    style={styles.calendarCell}
+                  >
+                    <Text style={[styles.calendarLabel, !day.tracked && styles.untrackedText]}>
+                      {day.label}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+          ))}
+        </View>
       </View>
 
       <View style={styles.bottomActions}>
-        <ActionText onPress={onBack}>home</ActionText>
+        <ActionText onPress={onBack}>back</ActionText>
       </View>
     </View>
   );
@@ -478,7 +492,7 @@ function Home() {
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
-  const calendarDays = createCalendarDays(appState.dailyOutcomes, today.date);
+  const calendarMonth = createCalendarMonth(appState.dailyOutcomes, today.date);
   const selectedOutcome = appState.dailyOutcomes.find((outcome) => outcome.date === selectedDate);
   const recommendation = chooseRecommendation({
     steps: latestSteps,
@@ -575,7 +589,7 @@ function Home() {
         </View>
       ) : surface === 'calendar' ? (
         <CalendarSurface
-          days={calendarDays}
+          month={calendarMonth}
           onBack={() => setSurface('home')}
           onSelectDate={(date) => {
             setSelectedDate(date);
@@ -697,15 +711,43 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 3,
   },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  calendarSurface: {
+    alignSelf: 'center',
     gap: 18,
-    paddingTop: 64,
+    justifyContent: 'center',
+    paddingTop: 96,
+    width: '100%',
+  },
+  weekdays: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: 308,
+  },
+  weekdayLabel: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.index,
+    letterSpacing: 0,
+    lineHeight: 18,
+    opacity: opacity.metadata,
+    textAlign: 'center',
+    width: 32,
+  },
+  monthGrid: {
+    alignSelf: 'center',
+    gap: 18,
+    width: 308,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   calendarCell: {
-    gap: 6,
-    width: 54,
+    alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
   },
   calendarLabel: {
     color: colors.foreground,
@@ -714,13 +756,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 24,
     opacity: opacity.body,
-  },
-  calendarMeta: {
-    color: colors.foreground,
-    fontSize: typeScale.metadata,
-    letterSpacing: 0,
-    lineHeight: 19,
-    opacity: opacity.metadata,
   },
   untrackedText: {
     opacity: opacity.disabled,

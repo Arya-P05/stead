@@ -4,31 +4,69 @@ export type CalendarDay = {
   date: string;
   label: string;
   tracked: boolean;
+  selectable: boolean;
 };
 
-export function createCalendarDays(
+export type CalendarMonth = {
+  label: string;
+  weeks: Array<Array<CalendarDay | null>>;
+};
+
+const monthNames = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+];
+
+export function createCalendarMonth(
   outcomes: DailyOutcome[],
   todayDate: string,
-): CalendarDay[] {
+): CalendarMonth {
   const trackedDates = new Set(outcomes.map((outcome) => outcome.date));
-  const sortedDates = [...trackedDates].sort();
-  const startDate = sortedDates[0] ?? todayDate;
-  const days: CalendarDay[] = [];
-  const cursor = parseDate(startDate);
-  const end = parseDate(todayDate);
+  const today = parseDate(todayDate);
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const weeks: Array<Array<CalendarDay | null>> = [[]];
 
-  while (cursor.getTime() <= end.getTime()) {
+  for (let index = 0; index < firstOfMonth.getUTCDay(); index += 1) {
+    weeks[0].push(null);
+  }
+
+  const cursor = new Date(firstOfMonth);
+
+  while (cursor.getTime() <= today.getTime() && cursor.getUTCMonth() === month) {
     const date = formatDate(cursor);
+    const tracked = trackedDates.has(date);
+    const currentWeek = weeks[weeks.length - 1];
 
-    days.push({
+    currentWeek.push({
       date,
       label: date.slice(-2),
-      tracked: trackedDates.has(date),
+      tracked,
+      selectable: tracked,
     });
+
+    if (currentWeek.length === 7) {
+      weeks.push([]);
+    }
+
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
-  return days;
+  return {
+    label: `${monthNames[month]} ${year}`,
+    weeks: weeks.filter((week) => week.length > 0),
+  };
 }
 
 function parseDate(date: string) {
