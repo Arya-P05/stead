@@ -22,6 +22,16 @@ import {
   startWorkoutSession,
 } from './src/domain/workoutSession';
 import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
+import {
+  addDailyOutcome,
+  addStepSample,
+  addWorkoutOutcome,
+  createInitialAppState,
+  upsertExerciseWeight,
+} from './src/data/appState';
+import type { AppState } from './src/data/appState';
+import { loadAppState, saveAppState } from './src/data/storage';
+import { createWorkoutOutcome } from './src/data/workoutOutcome';
 
 const today = {
   dateLabel: 'tuesday',
@@ -118,6 +128,7 @@ const recommendation = chooseRecommendation({
 
 type FeedbackState = 'idle' | 'success' | 'warning';
 type WorkoutMode = 'exercise' | 'voice';
+type Surface = 'home' | 'day';
 
 function ActionText({
   children,
@@ -217,6 +228,49 @@ function DayRow({
   }
 
   return row;
+}
+
+function DaySurface({
+  loggedSets,
+  onBack,
+  onWorkout,
+}: {
+  loggedSets: number;
+  onBack: () => void;
+  onWorkout: () => void;
+}) {
+  return (
+    <View style={styles.content}>
+      <View style={styles.dayHeader}>
+        <View>
+          <Text style={styles.titleText}>{today.dateLabel}</Text>
+          <Text style={styles.metadataText}>{today.dateMeta}</Text>
+        </View>
+        <Text style={styles.monoMeta}>{loggedSets > 0 ? `${loggedSets} / 17` : '5 / 7'}</Text>
+      </View>
+
+      <View style={styles.dayList}>
+        {dayItems.map((item, index) => (
+          <DayRow
+            key={`${item.title}-${index}`}
+            index={index}
+            item={item}
+            onWorkout={onWorkout}
+          />
+        ))}
+      </View>
+
+      <View style={styles.nudgeLine}>
+        <Text style={styles.metadataText}>{recommendation.action}</Text>
+        <Text style={styles.monoMeta}>{recommendation.reason}</Text>
+      </View>
+
+      <View style={styles.bottomActions}>
+        <ActionText onPress={onBack}>home</ActionText>
+        <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
+      </View>
+    </View>
+  );
 }
 
 function FormatTimer({ seconds }: { seconds: number }) {
@@ -376,57 +430,148 @@ function WorkoutSurface({
 }
 
 function Home() {
+  const [appState, setAppState] = useState<AppState>(() => createInitialAppState());
+  const [hydrated, setHydrated] = useState(false);
+  const [surface, setSurface] = useState<Surface>('home');
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(workoutPlan, Date.now()),
   );
   const loggedSets = workoutSession.sets.length;
+  const latestSteps = appState.stepSamples[0]?.steps ?? today.steps;
+  const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
+  const completedWorkouts = appState.workoutOutcomes.length;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadAppState().then((stored) => {
+      if (!cancelled) {
+        setAppState(stored);
+        setHydrated(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) {
+      saveAppState(undefined, appState);
+    }
+  }, [appState, hydrated]);
 
   const logWorkoutSet = () => {
     setWorkoutSession((session) => completeSet(session, workoutPlan, Date.now()));
+  };
+  const logWalk = () => {
+    const steps = Math.min(today.stepGoal, latestSteps + 1200);
+
+    setAppState((state) =>
+      addDailyOutcome(
+        addStepSample(state, {
+          capturedAt: Date.now(),
+          steps,
+          source: 'manual',
+        }),
+        {
+          date: '2026-03-04',
+          completedItems: 6,
+          plannedItems: 7,
+          steps,
+          focusMinutes: today.focusMinutes,
+          note: 'walk logged',
+        },
+      ),
+    );
+  };
+  const endWorkout = () => {
+    const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
+
+    setAppState((state) => {
+      const withWorkout = addWorkoutOutcome(state, outcome);
+
+      return outcome.exercises.reduce(
+        (nextState, exercise) =>
+          exercise.weightLb === undefined
+            ? nextState
+            : upsertExerciseWeight(nextState, {
+                exerciseId: exercise.exerciseId,
+                weightLb: exercise.weightLb,
+                updatedAt: outcome.completedAt,
+              }),
+        withWorkout,
+      );
+    });
+    setWorkoutVisible(false);
   };
 
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
-      <View style={styles.content}>
-        <View style={styles.dayHeader}>
-          <View>
-            <Text style={styles.titleText}>{today.dateLabel}</Text>
-            <Text style={styles.metadataText}>{today.dateMeta}</Text>
+      {surface === 'home' ? (
+        <View style={styles.homeContent}>
+          <View style={styles.homeHeader}>
+            <Text style={styles.brand}>stead</Text>
+            <Text style={styles.metadataText}>
+              {completedWorkouts > 0 ? `${completedWorkouts} workouts logged` : 'day 01 · lock in'}
+            </Text>
           </View>
-          <Text style={styles.monoMeta}>
-            {loggedSets > 0 ? `${loggedSets} / 17` : '5 / 7'}
-          </Text>
-        </View>
 
-        <View style={styles.dayList}>
-          {dayItems.map((item, index) => (
-            <DayRow
-              key={`${item.title}-${index}`}
-              index={index}
-              item={item}
-              onWorkout={() => setWorkoutVisible(true)}
-            />
-          ))}
-        </View>
+          <View style={styles.recommendation}>
+            <Text style={styles.indexText}>next</Text>
+            <Text style={styles.nextAction}>{recommendation.action}</Text>
+            <Text style={styles.supporting}>{recommendation.reason}</Text>
+          </View>
 
-        <View style={styles.nudgeLine}>
-          <Text style={styles.metadataText}>{recommendation.action}</Text>
-          <Text style={styles.monoMeta}>{recommendation.reason}</Text>
-        </View>
+          <View style={styles.inlineActions}>
+            <ActionText onPress={logWalk}>walk logged</ActionText>
+            <Text style={styles.dot}>·</Text>
+            <ActionText onPress={() => setWorkoutVisible(true)}>workout</ActionText>
+            <Text style={styles.dot}>·</Text>
+            <ActionText onPress={() => setSurface('day')}>today</ActionText>
+          </View>
 
-        <View style={styles.bottomActions}>
-          <ActionText onPress={() => undefined}>add</ActionText>
-          <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
+          <View style={styles.progressBlock}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.indexText}>steps</Text>
+              <Text style={styles.monoMeta}>{latestSteps.toLocaleString()} / 10,000</Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${stepProgress * 100}%` }]} />
+            </View>
+          </View>
+
+          <View style={styles.metrics}>
+            <View style={styles.metric}>
+              <Text style={styles.indexText}>focus</Text>
+              <Text style={styles.metricValue}>2h 34m</Text>
+              <Text style={styles.metadataText}>deep work today</Text>
+            </View>
+            <View style={styles.metric}>
+              <Text style={styles.indexText}>body</Text>
+              <Text style={styles.metricValue}>{today.workout}</Text>
+              <Text style={styles.metadataText}>
+                {loggedSets > 0 ? `${loggedSets} sets logged` : 'planned session'}
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
+      ) : (
+        <DaySurface
+          loggedSets={loggedSets}
+          onBack={() => setSurface('home')}
+          onWorkout={() => setWorkoutVisible(true)}
+        />
+      )}
 
       <WorkoutSurface
         session={workoutSession}
         visible={workoutVisible}
         onAddRest={() => setWorkoutSession((session) => addRestTime(session, 30))}
-        onClose={() => setWorkoutVisible(false)}
+        onClose={endWorkout}
         onLogSet={logWorkoutSet}
         onSkipRest={() => setWorkoutSession((session) => skipRest(session))}
       />
@@ -458,6 +603,90 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
     paddingTop: 44,
+  },
+  homeContent: {
+    flex: 1,
+    paddingBottom: 34,
+    paddingHorizontal: spacing.screenX,
+    paddingTop: 18,
+  },
+  homeHeader: {
+    gap: 6,
+  },
+  brand: {
+    color: colors.foreground,
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0,
+    opacity: opacity.title,
+  },
+  recommendation: {
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+  },
+  nextAction: {
+    color: colors.foreground,
+    fontSize: 34,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 39,
+    opacity: opacity.title,
+  },
+  supporting: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.enabled,
+  },
+  inlineActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingBottom: 44,
+  },
+  dot: {
+    color: colors.foreground,
+    fontSize: typeScale.action,
+    opacity: opacity.metadata,
+  },
+  progressBlock: {
+    gap: 12,
+    paddingBottom: 34,
+  },
+  progressHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressTrack: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    height: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderRadius: 999,
+    height: 3,
+  },
+  metrics: {
+    flexDirection: 'row',
+    gap: 28,
+  },
+  metric: {
+    flex: 1,
+    gap: 8,
+  },
+  metricValue: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 25,
+    opacity: opacity.title,
   },
   dayHeader: {
     alignItems: 'flex-start',
