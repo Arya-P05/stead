@@ -42,7 +42,7 @@ describe('storage', () => {
     const storage = createMemoryStorage();
     const state = {
       ...createInitialAppState(),
-      stepSamples: [{ capturedAt: 1000, steps: 6400, source: 'manual' as const }],
+      stepSamples: [{ capturedAt: 1000, steps: 6400, source: 'health' as const }],
     };
 
     await saveAppState(storage, state);

@@ -34,7 +34,7 @@ export type ExerciseWeight = {
 export type StepSample = {
   capturedAt: number;
   steps: number;
-  source: 'health' | 'manual';
+  source: 'health';
 };
 
 export type AppState = {

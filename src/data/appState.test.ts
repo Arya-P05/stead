@@ -98,7 +98,7 @@ describe('app state', () => {
     const first = addStepSample(createInitialAppState(), {
       capturedAt: 1000,
       steps: 5000,
-      source: 'manual',
+      source: 'health',
     });
     const second = addStepSample(first, {
       capturedAt: 2000,
@@ -108,12 +108,12 @@ describe('app state', () => {
     const updated = addStepSample(second, {
       capturedAt: 1000,
       steps: 5200,
-      source: 'manual',
+      source: 'health',
     });
 
     expect(updated.stepSamples).toEqual([
       { capturedAt: 2000, steps: 6400, source: 'health' },
-      { capturedAt: 1000, steps: 5200, source: 'manual' },
+      { capturedAt: 1000, steps: 5200, source: 'health' },
     ]);
   });
 });
