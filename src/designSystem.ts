@@ -22,6 +22,8 @@ export const opacity = {
 
 export const spacing = {
   screenX: 26,
+  /** Top inset so primary screen titles (home / calendar / day) share one vertical rhythm. */
+  screenTop: 54,
   sheetX: 26,
 };
 
