@@ -40,6 +40,7 @@ For the next four months, stead helps you lock in by turning goals into tiny tim
 - Voice is for capture; the UI is for confirmation and momentum.
 - Every interaction should feel faster than opening Notes, Reminders, or Fitness.
 - The app stores locally first. Cloud sync should mirror the local model, not own it.
+- Steps come from HealthKit only. Do not add manual step logging.
 
 ## first data model sketch
 
