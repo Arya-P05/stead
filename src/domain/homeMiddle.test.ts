@@ -33,18 +33,18 @@ describe('chooseHomeMiddle', () => {
           type: 'steady',
         },
         remainingItems: [
-          { title: 'walk', time: 'now' },
-          { title: 'push day', time: '6:30' },
-          { title: 'read', time: '9:00' },
+          { title: 'walk' },
+          { title: 'push day', action: 'workout' },
+          { title: 'read' },
         ],
       }),
     ).toEqual({
       type: 'today',
       meta: 'three left today',
       items: [
-        { title: 'walk', time: 'now' },
-        { title: 'push day', time: '6:30' },
-        { title: 'read', time: '9:00' },
+        { title: 'walk' },
+        { title: 'push day', action: 'workout' },
+        { title: 'read' },
       ],
     });
   });
@@ -58,7 +58,7 @@ describe('chooseHomeMiddle', () => {
           reason: 'planned session still open',
           type: 'workout',
         },
-        remainingItems: [{ title: 'push day', time: '6:30' }],
+        remainingItems: [{ title: 'push day', action: 'workout' }],
       }),
     ).toEqual({
       type: 'next',

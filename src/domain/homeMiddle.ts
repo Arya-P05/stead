@@ -2,7 +2,7 @@ import type { Recommendation } from './recommendations';
 
 export type RemainingItem = {
   title: string;
-  time: string;
+  action?: 'workout';
 };
 
 export type HomeMiddle =

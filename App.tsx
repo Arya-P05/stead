@@ -95,9 +95,9 @@ const dayItems: DayItem[] = [
 ];
 
 const remainingItems = [
-  { title: 'walk', time: 'now' },
-  { title: 'push day', time: '6:30' },
-  { title: 'read', time: '9:00' },
+  { title: 'walk' },
+  { title: 'push day', action: 'workout' as const },
+  { title: 'read' },
 ];
 
 type FeedbackState = 'idle' | 'success' | 'warning';
@@ -368,9 +368,11 @@ function addMonths(date: string, offset: number) {
 
 function HomeMiddleSurface({
   middle,
+  onCompleteItem,
   onWorkout,
 }: {
   middle: HomeMiddle;
+  onCompleteItem: (title: string) => void;
   onWorkout: () => void;
 }) {
   if (middle.type === 'moment') {
@@ -402,15 +404,19 @@ function HomeMiddleSurface({
       <Text style={styles.homeMeta}>{middle.meta}</Text>
       <View style={styles.todayThreeList}>
         {middle.items.map((item, index) => (
-          <View key={`${item.title}-${item.time}`} style={styles.todayThreeRow}>
+          <PressableScale
+            key={`${item.title}-${index}`}
+            onPress={() => (item.action === 'workout' ? onWorkout() : onCompleteItem(item.title))}
+            style={styles.todayThreeRow}
+          >
             <Text style={styles.indexText}>{String(index + 1).padStart(2, '0')}</Text>
             <Text style={[styles.todayThreeTitle, index > 0 && styles.untrackedText]}>
               {item.title}
             </Text>
-            <Text style={[styles.todayThreeTime, index > 0 && styles.untrackedText]}>
-              {item.time}
+            <Text style={[styles.todayThreeAction, index > 0 && styles.untrackedText]}>
+              {item.action === 'workout' ? 'start' : 'do'}
             </Text>
-          </View>
+          </PressableScale>
         ))}
       </View>
     </View>
@@ -855,6 +861,18 @@ function Home() {
   const closeWorkout = () => {
     setWorkoutVisible(false);
   };
+  const completeLooseItem = (title: string) => {
+    setAppState((state) =>
+      addDailyOutcome(state, {
+        date: today.date,
+        completedItems: Math.min((selectedOutcome?.completedItems ?? 5) + 1, 7),
+        plannedItems: 7,
+        steps: latestSteps,
+        focusMinutes: today.focusMinutes,
+        note: `${title} done`,
+      }),
+    );
+  };
   const finishWorkout = () => {
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
 
@@ -914,6 +932,7 @@ function Home() {
 
             <HomeMiddleSurface
               middle={homeMiddle}
+              onCompleteItem={completeLooseItem}
               onWorkout={() => setWorkoutVisible(true)}
             />
 
@@ -1106,13 +1125,12 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     opacity: opacity.title,
   },
-  todayThreeTime: {
+  todayThreeAction: {
     color: colors.foreground,
-    fontFamily: typography.mono,
-    fontSize: typeScale.metadata,
+    fontSize: typeScale.action,
     letterSpacing: 0,
-    lineHeight: 19,
-    opacity: opacity.metadata,
+    lineHeight: 24,
+    opacity: opacity.enabled,
   },
   dot: {
     color: colors.foreground,
