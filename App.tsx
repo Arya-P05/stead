@@ -278,10 +278,14 @@ function DaySurface({
 function CalendarSurface({
   month,
   onBack,
+  onNextMonth,
+  onPreviousMonth,
   onSelectDate,
 }: {
   month: CalendarMonth;
   onBack: () => void;
+  onNextMonth: () => void;
+  onPreviousMonth: () => void;
   onSelectDate: (date: string) => void;
 }) {
   return (
@@ -289,7 +293,7 @@ function CalendarSurface({
       <View style={styles.dayHeader}>
         <View>
           <Text style={styles.titleText}>{month.label}</Text>
-          <Text style={styles.metadataText}>tracked days are brighter</Text>
+          <Text style={styles.metadataText}>{month.meta}</Text>
         </View>
       </View>
 
@@ -314,7 +318,12 @@ function CalendarSurface({
                     onPress={() => onSelectDate(day.date)}
                     style={styles.calendarCell}
                   >
-                    <Text style={[styles.calendarLabel, !day.tracked && styles.untrackedText]}>
+                    <Text
+                      style={[
+                        styles.calendarLabel,
+                        (!day.tracked || day.future) && styles.untrackedText,
+                      ]}
+                    >
                       {day.label}
                     </Text>
                   </Pressable>
@@ -327,9 +336,22 @@ function CalendarSurface({
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
+        <View style={styles.monthActions}>
+          <ActionText onPress={onPreviousMonth}>prev</ActionText>
+          <Text style={styles.dot}>·</Text>
+          <ActionText onPress={onNextMonth}>next</ActionText>
+        </View>
       </View>
     </View>
   );
+}
+
+function addMonths(date: string, offset: number) {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+
+  parsed.setUTCMonth(parsed.getUTCMonth() + offset, 1);
+
+  return parsed.toISOString().slice(0, 10);
 }
 
 function HomeMiddleSurface({
@@ -544,6 +566,7 @@ function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [surface, setSurface] = useState<Surface>('home');
   const [selectedDate, setSelectedDate] = useState(today.date);
+  const [visibleMonthDate, setVisibleMonthDate] = useState(today.date);
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(workoutPlan, Date.now()),
@@ -551,7 +574,7 @@ function Home() {
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
-  const calendarMonth = createCalendarMonth(appState.dailyOutcomes, today.date);
+  const calendarMonth = createCalendarMonth(appState.dailyOutcomes, today.date, visibleMonthDate);
   const selectedOutcome = appState.dailyOutcomes.find((outcome) => outcome.date === selectedDate);
   const recommendation = chooseRecommendation({
     steps: latestSteps,
@@ -651,6 +674,8 @@ function Home() {
         <CalendarSurface
           month={calendarMonth}
           onBack={() => setSurface('home')}
+          onNextMonth={() => setVisibleMonthDate((date) => addMonths(date, 1))}
+          onPreviousMonth={() => setVisibleMonthDate((date) => addMonths(date, -1))}
           onSelectDate={(date) => {
             setSelectedDate(date);
             setSurface('day');
@@ -826,7 +851,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: 18,
     justifyContent: 'center',
-    paddingTop: 96,
+    paddingTop: 72,
     width: '100%',
   },
   weekdays: {
@@ -847,7 +872,7 @@ const styles = StyleSheet.create({
   },
   monthGrid: {
     alignSelf: 'center',
-    gap: 18,
+    gap: 14,
     width: 308,
   },
   weekRow: {
@@ -870,6 +895,11 @@ const styles = StyleSheet.create({
   },
   untrackedText: {
     opacity: opacity.disabled,
+  },
+  monthActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
   },
   metrics: {
     flexDirection: 'row',
