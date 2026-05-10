@@ -28,8 +28,10 @@ import {
 import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
 import {
   addWorkoutOutcome,
+  clearActiveWorkoutSession,
   createInitialAppState,
   hasCompletedWorkout,
+  saveActiveWorkoutSession,
   upsertExerciseWeight,
 } from './src/data/appState';
 import type { AppState } from './src/data/appState';
@@ -661,6 +663,9 @@ function Home() {
     loadAppState().then((stored) => {
       if (!cancelled) {
         setAppState(stored);
+        if (stored.activeWorkoutSession) {
+          setWorkoutSession(stored.activeWorkoutSession);
+        }
         setHydrated(true);
       }
     });
@@ -677,10 +682,22 @@ function Home() {
   }, [appState, hydrated]);
 
   const logWorkoutSet = () => {
-    setWorkoutSession((session) => completeSet(session, workoutPlan, Date.now()));
+    setWorkoutSession((session) => {
+      const nextSession = completeSet(session, workoutPlan, Date.now());
+
+      setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+
+      return nextSession;
+    });
   };
   const selectWorkoutExercise = (index: number) => {
-    setWorkoutSession((session) => selectExercise(session, workoutPlan, index));
+    setWorkoutSession((session) => {
+      const nextSession = selectExercise(session, workoutPlan, index);
+
+      setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+
+      return nextSession;
+    });
   };
   const closeWorkout = () => {
     setWorkoutVisible(false);
@@ -690,8 +707,7 @@ function Home() {
 
     setAppState((state) => {
       const withWorkout = addWorkoutOutcome(state, outcome);
-
-      return outcome.exercises.reduce(
+      const withWeights = outcome.exercises.reduce(
         (nextState, exercise) =>
           exercise.weightLb === undefined
             ? nextState
@@ -702,7 +718,10 @@ function Home() {
               }),
         withWorkout,
       );
+
+      return clearActiveWorkoutSession(withWeights);
     });
+    setWorkoutSession(startWorkoutSession(workoutPlan, Date.now()));
     setWorkoutVisible(false);
   };
 
@@ -761,12 +780,28 @@ function Home() {
       <WorkoutSurface
         session={workoutSession}
         visible={workoutVisible}
-        onAddRest={() => setWorkoutSession((session) => addRestTime(session, 30))}
+        onAddRest={() =>
+          setWorkoutSession((session) => {
+            const nextSession = addRestTime(session, 30);
+
+            setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+
+            return nextSession;
+          })
+        }
         onBack={closeWorkout}
         onFinishWorkout={finishWorkout}
         onLogSet={logWorkoutSet}
         onSelectExercise={selectWorkoutExercise}
-        onSkipRest={() => setWorkoutSession((session) => skipRest(session))}
+        onSkipRest={() =>
+          setWorkoutSession((session) => {
+            const nextSession = skipRest(session);
+
+            setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+
+            return nextSession;
+          })
+        }
       />
     </SafeAreaView>
   );
