@@ -1,3 +1,6 @@
+import { completeSet, selectExercise } from './workoutSession';
+import type { WorkoutPlan, WorkoutSession } from './workoutSession';
+
 export type WorkoutVoiceLog = {
   exerciseName: string;
   sets: number;
@@ -68,6 +71,38 @@ export function parseWorkoutVoiceLog(transcript: string): WorkoutVoiceLog | null
   };
 }
 
+export function applyWorkoutVoiceLog(
+  plan: WorkoutPlan,
+  session: WorkoutSession,
+  transcript: string,
+  now: number,
+): { success: boolean; session: WorkoutSession } {
+  const parsed = parseWorkoutVoiceLog(transcript);
+
+  if (!parsed) {
+    return { success: false, session };
+  }
+
+  const exerciseIndex = plan.exercises.findIndex((exercise) =>
+    namesMatch(exercise.name, parsed.exerciseName),
+  );
+
+  if (exerciseIndex === -1) {
+    return { success: false, session };
+  }
+
+  let nextSession = selectExercise(session, plan, exerciseIndex);
+
+  for (let setIndex = 0; setIndex < parsed.sets; setIndex += 1) {
+    nextSession = completeSet(nextSession, plan, now + setIndex, {
+      reps: parsed.reps,
+      weightLb: parsed.weightLb,
+    });
+  }
+
+  return { success: true, session: nextSession };
+}
+
 function readExerciseName(transcript: string) {
   const match = transcript.match(/\bon\s+(.+)$/);
   const fallbackMatch = transcript.match(/\b(?:lb|lbs|pounds?|at\s+\d+)\s+(.+)$/);
@@ -116,4 +151,19 @@ function parseCount(value: string) {
   }
 
   return numberWords[value] ?? null;
+}
+
+function namesMatch(planName: string, transcriptName: string) {
+  const normalizedPlan = normalizeName(planName);
+  const normalizedTranscript = normalizeName(transcriptName);
+
+  return (
+    normalizedPlan.includes(normalizedTranscript) ||
+    normalizedTranscript.includes(normalizedPlan) ||
+    normalizedPlan.replace('dumbbell', 'db').includes(normalizedTranscript)
+  );
+}
+
+function normalizeName(value: string) {
+  return value.toLowerCase().replace(/\bdumbbell\b/g, 'db').replace(/\s+/g, ' ').trim();
 }

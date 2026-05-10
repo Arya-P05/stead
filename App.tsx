@@ -46,7 +46,7 @@ import type { CalendarMonth } from './src/data/calendarDays';
 import { scheduleRecommendationNudge } from './src/services/notifications';
 import { syncTodaySteps } from './src/services/healthkit';
 import { createDefaultWorkoutPlan, updateExercise } from './src/data/workoutPlan';
-import { parseWorkoutVoiceLog } from './src/domain/voiceLog';
+import { applyWorkoutVoiceLog, parseWorkoutVoiceLog } from './src/domain/voiceLog';
 
 const today = {
   date: '2026-05-09',
@@ -386,21 +386,6 @@ function FormatTimer({ seconds }: { seconds: number }) {
       {minutes}:{String(remainingSeconds).padStart(2, '0')}
     </Text>
   );
-}
-
-function namesMatch(planName: string, transcriptName: string) {
-  const normalizedPlan = normalizeName(planName);
-  const normalizedTranscript = normalizeName(transcriptName);
-
-  return (
-    normalizedPlan.includes(normalizedTranscript) ||
-    normalizedTranscript.includes(normalizedPlan) ||
-    normalizedPlan.replace('dumbbell', 'db').includes(normalizedTranscript)
-  );
-}
-
-function normalizeName(value: string) {
-  return value.toLowerCase().replace(/\bdumbbell\b/g, 'db').replace(/\s+/g, ' ').trim();
 }
 
 function WorkoutSurface({
@@ -805,35 +790,14 @@ function Home() {
     });
   };
   const logWorkoutVoice = (transcript: string) => {
-    const parsed = parseWorkoutVoiceLog(transcript);
+    const applied = applyWorkoutVoiceLog(workoutPlan, workoutSession, transcript, Date.now());
 
-    if (!parsed) {
+    if (!applied.success) {
       return false;
     }
 
-    const exerciseIndex = workoutPlan.exercises.findIndex((exercise) =>
-      namesMatch(exercise.name, parsed.exerciseName),
-    );
-
-    if (exerciseIndex === -1) {
-      return false;
-    }
-
-    setWorkoutSession((session) => {
-      let nextSession = selectExercise(session, workoutPlan, exerciseIndex);
-
-      for (let setIndex = 0; setIndex < parsed.sets; setIndex += 1) {
-        nextSession = completeSet(nextSession, workoutPlan, Date.now() + setIndex, {
-          reps: parsed.reps,
-          weightLb: parsed.weightLb,
-        });
-      }
-
-      setAppState((state) => saveActiveWorkoutSession(state, nextSession));
-
-      return nextSession;
-    });
-
+    setWorkoutSession(applied.session);
+    setAppState((state) => saveActiveWorkoutSession(state, applied.session));
     return true;
   };
   const selectWorkoutExercise = (index: number) => {
