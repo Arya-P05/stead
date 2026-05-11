@@ -15,7 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aryap.stead",
-      "appleTeamId": "547SCMFGR9"
+      "appleTeamId": "547SCMFGR9",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "plugins": [
       [
@@ -38,6 +41,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e0501317-0997-42ec-96b5-3a5e939d6dab"
+      }
+    },
+    "owner": "patelarya"
   }
 }
