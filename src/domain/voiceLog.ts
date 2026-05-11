@@ -1,5 +1,5 @@
-import { completeSet, selectExercise } from './workoutSession';
-import type { WorkoutPlan, WorkoutSession } from './workoutSession';
+import { completeSet, selectExercise } from "./workoutSession";
+import type { WorkoutPlan, WorkoutSession } from "./workoutSession";
 
 export type WorkoutVoiceLog = {
   exerciseName: string;
@@ -38,11 +38,13 @@ const numberWords: Record<string, number> = {
   ninety: 90,
 };
 
-export function parseWorkoutVoiceLog(transcript: string): WorkoutVoiceLog | null {
+export function parseWorkoutVoiceLog(
+  transcript: string,
+): WorkoutVoiceLog | null {
   const normalized = transcript
     .toLowerCase()
-    .replace(/[.,]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[.,]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 
   if (normalized.length === 0) {
@@ -105,13 +107,15 @@ export function applyWorkoutVoiceLog(
 
 function readExerciseName(transcript: string) {
   const match = transcript.match(/\bon\s+(.+)$/);
-  const fallbackMatch = transcript.match(/\b(?:lb|lbs|pounds?|at\s+\d+)\s+(.+)$/);
+  const fallbackMatch = transcript.match(
+    /\b(?:lb|lbs|pounds?|at\s+\d+)\s+(.+)$/,
+  );
   const rawName = match?.[1] ?? fallbackMatch?.[1];
 
   return rawName
-    ?.replace(/\b\d+\b/g, '')
-    .replace(/\b(?:sets?|reps?|lb|lbs|pounds?|at|of)\b/g, '')
-    .replace(/\s+/g, ' ')
+    ?.replace(/\b\d+\b/g, "")
+    .replace(/\b(?:sets?|reps?|lb|lbs|pounds?|at|of)\b/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -122,7 +126,11 @@ function readCountBefore(transcript: string, marker: RegExp) {
     return null;
   }
 
-  const before = transcript.slice(0, markerMatch.index).trim().split(' ').at(-1);
+  const before = transcript
+    .slice(0, markerMatch.index)
+    .trim()
+    .split(" ")
+    .at(-1);
 
   return before ? parseCount(before) : null;
 }
@@ -137,7 +145,7 @@ function readCountAfter(transcript: string, marker: RegExp) {
   const after = transcript
     .slice(markerMatch.index + markerMatch[0].length)
     .trim()
-    .split(' ')
+    .split(" ")
     .at(0);
 
   return after ? parseCount(after) : null;
@@ -160,10 +168,14 @@ function namesMatch(planName: string, transcriptName: string) {
   return (
     normalizedPlan.includes(normalizedTranscript) ||
     normalizedTranscript.includes(normalizedPlan) ||
-    normalizedPlan.replace('dumbbell', 'db').includes(normalizedTranscript)
+    normalizedPlan.replace("dumbbell", "db").includes(normalizedTranscript)
   );
 }
 
 function normalizeName(value: string) {
-  return value.toLowerCase().replace(/\bdumbbell\b/g, 'db').replace(/\s+/g, ' ').trim();
+  return value
+    .toLowerCase()
+    .replace(/\bdumbbell\b/g, "db")
+    .replace(/\s+/g, " ")
+    .trim();
 }

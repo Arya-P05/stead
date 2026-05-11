@@ -1,5 +1,5 @@
-import type { WorkoutPlan, WorkoutSession } from '../domain/workoutSession';
-import type { WorkoutOutcome } from './appState';
+import type { WorkoutPlan, WorkoutSession } from "../domain/workoutSession";
+import type { WorkoutOutcome } from "./appState";
 
 export function createWorkoutOutcome(
   plan: WorkoutPlan,
@@ -15,7 +15,9 @@ export function createWorkoutOutcome(
     totalSets: session.sets.length,
     exercises: plan.exercises
       .map((exercise) => {
-        const sets = session.sets.filter((set) => set.exerciseId === exercise.id);
+        const sets = session.sets.filter(
+          (set) => set.exerciseId === exercise.id,
+        );
         const latestSet = sets.at(-1);
 
         return {

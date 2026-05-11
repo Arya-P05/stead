@@ -1,17 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createInitialAppState } from './appState';
-import type { AppState } from './appState';
-import { normalizeWorkoutPlan } from './workoutPlan';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createInitialAppState } from "./appState";
+import type { AppState } from "./appState";
+import { normalizeWorkoutPlan } from "./workoutPlan";
 
 export type StorageAdapter = {
   getItem: (key: string) => Promise<string | null>;
   setItem: (key: string, value: string) => Promise<void>;
 };
 
-export const APP_STATE_KEY = 'stead.app-state';
+export const APP_STATE_KEY = "stead.app-state";
 export const appStorage: StorageAdapter = AsyncStorage;
 
-export async function loadAppState(storage: StorageAdapter = appStorage): Promise<AppState> {
+export async function loadAppState(
+  storage: StorageAdapter = appStorage,
+): Promise<AppState> {
   const stored = await storage.getItem(APP_STATE_KEY);
 
   if (stored === null) {

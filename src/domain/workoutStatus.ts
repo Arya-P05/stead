@@ -1,5 +1,5 @@
-import { getActiveExercise, getRestRemainingSeconds } from './workoutSession';
-import type { WorkoutPlan, WorkoutSession } from './workoutSession';
+import { getActiveExercise, getRestRemainingSeconds } from "./workoutSession";
+import type { WorkoutPlan, WorkoutSession } from "./workoutSession";
 
 export type WorkoutStatus = {
   title: string;
@@ -20,7 +20,7 @@ export function getWorkoutStatus(
     return {
       title: plan.name,
       meta: `done · ${session.sets.length} sets`,
-      action: 'done',
+      action: "done",
       restSeconds: 0,
       isComplete: true,
     };
@@ -30,7 +30,7 @@ export function getWorkoutStatus(
     return {
       title: plan.name,
       meta: `rest · ${restSeconds}s`,
-      action: 'log set',
+      action: "log set",
       restSeconds,
       isComplete: false,
     };
@@ -38,8 +38,8 @@ export function getWorkoutStatus(
 
   return {
     title: plan.name,
-    meta: `next up · ${getActiveExercise(plan, session)?.name ?? 'done'}`,
-    action: 'log set',
+    meta: `next up · ${getActiveExercise(plan, session)?.name ?? "done"}`,
+    action: "log set",
     restSeconds: 0,
     isComplete: false,
   };

@@ -1,6 +1,11 @@
-export type WeatherCondition = 'sunny' | 'cloudy' | 'rain' | 'storm';
+export type WeatherCondition = "sunny" | "cloudy" | "rain" | "storm";
 
-export type RecommendationType = 'walk' | 'workout' | 'calendar' | 'focus' | 'steady';
+export type RecommendationType =
+  | "walk"
+  | "workout"
+  | "calendar"
+  | "focus"
+  | "steady";
 
 export type DayState = {
   steps: number;
@@ -35,40 +40,43 @@ export function chooseRecommendation(day: DayState): Recommendation {
     day.minutesUntilNextEvent <= CALENDAR_PREP_WINDOW_MINUTES
   ) {
     return {
-      action: 'prep for next thing',
+      action: "prep for next thing",
       reason: `starts in ${day.minutesUntilNextEvent} min`,
-      type: 'calendar',
+      type: "calendar",
     };
   }
 
   if (shouldWalk(day)) {
     return {
-      action: 'take a 10 min walk',
-      reason: day.minutesUntilNextEvent === null ? 'sunny window' : 'sunny window before calls',
-      type: 'walk',
+      action: "take a 10 min walk",
+      reason:
+        day.minutesUntilNextEvent === null
+          ? "sunny window"
+          : "sunny window before calls",
+      type: "walk",
     };
   }
 
   if (day.minutesWorked >= LONG_WORK_BLOCK_MINUTES) {
     return {
-      action: 'take a 5 min reset',
-      reason: 'long work block',
-      type: 'focus',
+      action: "take a 5 min reset",
+      reason: "long work block",
+      type: "focus",
     };
   }
 
   if (day.workout.planned && !day.workout.completed) {
     return {
       action: `start ${day.workout.name}`,
-      reason: 'planned session still open',
-      type: 'workout',
+      reason: "planned session still open",
+      type: "workout",
     };
   }
 
   return {
-    action: 'keep going',
-    reason: 'day is on track',
-    type: 'steady',
+    action: "keep going",
+    reason: "day is on track",
+    type: "steady",
   };
 }
 
@@ -76,9 +84,9 @@ function shouldWalk(day: DayState) {
   return day.stepGoal - day.steps >= WALK_STEP_GAP && isWalkable(day.weather);
 }
 
-function isWalkable(weather: DayState['weather']) {
+function isWalkable(weather: DayState["weather"]) {
   return (
-    weather.condition === 'sunny' &&
+    weather.condition === "sunny" &&
     weather.temperatureF >= 50 &&
     weather.temperatureF <= 90 &&
     weather.precipitationChance <= 0.2

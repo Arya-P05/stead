@@ -1,6 +1,6 @@
-import type { WorkoutSession } from '../domain/workoutSession';
-import type { WorkoutPlan } from '../domain/workoutSession';
-import { createDefaultWorkoutPlan } from './workoutPlan';
+import type { WorkoutSession } from "../domain/workoutSession";
+import type { WorkoutPlan } from "../domain/workoutSession";
+import { createDefaultWorkoutPlan } from "./workoutPlan";
 
 export type DailyOutcome = {
   date: string;
@@ -38,7 +38,7 @@ export type ExerciseWeight = {
 export type StepSample = {
   capturedAt: number;
   steps: number;
-  source: 'health';
+  source: "health";
 };
 
 export type AppState = {
@@ -63,7 +63,10 @@ export function createInitialAppState(): AppState {
   };
 }
 
-export function addDailyOutcome(state: AppState, outcome: DailyOutcome): AppState {
+export function addDailyOutcome(
+  state: AppState,
+  outcome: DailyOutcome,
+): AppState {
   return {
     ...state,
     dailyOutcomes: [
@@ -73,7 +76,10 @@ export function addDailyOutcome(state: AppState, outcome: DailyOutcome): AppStat
   };
 }
 
-export function addWorkoutOutcome(state: AppState, outcome: WorkoutOutcome): AppState {
+export function addWorkoutOutcome(
+  state: AppState,
+  outcome: WorkoutOutcome,
+): AppState {
   return {
     ...state,
     workoutOutcomes: [
@@ -104,14 +110,20 @@ export function clearActiveWorkoutSession(state: AppState): AppState {
   };
 }
 
-export function saveWorkoutPlan(state: AppState, workoutPlan: WorkoutPlan): AppState {
+export function saveWorkoutPlan(
+  state: AppState,
+  workoutPlan: WorkoutPlan,
+): AppState {
   return {
     ...state,
     workoutPlan,
   };
 }
 
-export function upsertExerciseWeight(state: AppState, weight: ExerciseWeight): AppState {
+export function upsertExerciseWeight(
+  state: AppState,
+  weight: ExerciseWeight,
+): AppState {
   const current = state.exerciseWeights[weight.exerciseId];
 
   if (current && current.updatedAt > weight.updatedAt) {
@@ -132,7 +144,9 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
     ...state,
     stepSamples: [
       sample,
-      ...state.stepSamples.filter((stored) => stored.capturedAt !== sample.capturedAt),
+      ...state.stepSamples.filter(
+        (stored) => stored.capturedAt !== sample.capturedAt,
+      ),
     ].sort((a, b) => b.capturedAt - a.capturedAt),
   };
 }

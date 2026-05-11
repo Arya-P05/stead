@@ -1,4 +1,4 @@
-import * as Notifications from 'expo-notifications';
+import * as Notifications from "expo-notifications";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -26,7 +26,7 @@ export type NotificationAdapter = {
       data: { source: string };
     };
     trigger: {
-      type: 'timeInterval';
+      type: "timeInterval";
       seconds: number;
     };
   }) => Promise<string>;
@@ -44,14 +44,16 @@ export async function scheduleRecommendationNudge(
   nudge: RecommendationNudge,
 ) {
   const permissions = await adapter.getPermissionsAsync();
-  if (permissions.status === 'denied') {
+  if (permissions.status === "denied") {
     return null;
   }
 
   const finalPermissions =
-    permissions.status === 'granted' ? permissions : await adapter.requestPermissionsAsync();
+    permissions.status === "granted"
+      ? permissions
+      : await adapter.requestPermissionsAsync();
 
-  if (finalPermissions.status !== 'granted' && !finalPermissions.granted) {
+  if (finalPermissions.status !== "granted" && !finalPermissions.granted) {
     return null;
   }
 
@@ -61,10 +63,10 @@ export async function scheduleRecommendationNudge(
       title: nudge.title,
       body: nudge.body,
       sound: false,
-      data: { source: 'stead' },
+      data: { source: "stead" },
     },
     trigger: {
-      type: 'timeInterval',
+      type: "timeInterval",
       seconds: nudge.secondsFromNow,
     },
   });

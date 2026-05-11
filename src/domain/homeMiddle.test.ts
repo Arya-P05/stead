@@ -1,14 +1,14 @@
-import { chooseHomeMiddle } from './homeMiddle';
-import type { Recommendation } from './recommendations';
+import { chooseHomeMiddle } from "./homeMiddle";
+import type { Recommendation } from "./recommendations";
 
 const walkRecommendation: Recommendation = {
-  action: 'take a 10 min walk',
-  reason: 'sunny window before calls',
-  type: 'walk',
+  action: "take a 10 min walk",
+  reason: "sunny window before calls",
+  type: "walk",
 };
 
-describe('chooseHomeMiddle', () => {
-  it('shows the moment when focus has run long and walking is useful', () => {
+describe("chooseHomeMiddle", () => {
+  it("shows the moment when focus has run long and walking is useful", () => {
     expect(
       chooseHomeMiddle({
         minutesWorked: 190,
@@ -16,10 +16,10 @@ describe('chooseHomeMiddle', () => {
         remainingItems: [],
       }),
     ).toEqual({
-      type: 'moment',
-      meta: 'focused · 3h 10m',
+      type: "moment",
+      meta: "focused · 3h 10m",
       phrase: "you've been at it three hours.\nthe sun is out.",
-      action: 'walk · ten min',
+      action: "walk · ten min",
     });
   });
 
@@ -28,23 +28,23 @@ describe('chooseHomeMiddle', () => {
       chooseHomeMiddle({
         minutesWorked: 80,
         recommendation: {
-          action: 'keep going',
-          reason: 'day is on track',
-          type: 'steady',
+          action: "keep going",
+          reason: "day is on track",
+          type: "steady",
         },
         remainingItems: [
-          { title: 'walk' },
-          { title: 'push day', action: 'workout' },
-          { title: 'read' },
+          { title: "walk" },
+          { title: "push day", action: "workout" },
+          { title: "read" },
         ],
       }),
     ).toEqual({
-      type: 'today',
-      meta: 'three left today',
+      type: "today",
+      meta: "three left today",
       items: [
-        { title: 'walk' },
-        { title: 'push day', action: 'workout' },
-        { title: 'read' },
+        { title: "walk" },
+        { title: "push day", action: "workout" },
+        { title: "read" },
       ],
     });
   });
@@ -54,19 +54,19 @@ describe('chooseHomeMiddle', () => {
       chooseHomeMiddle({
         minutesWorked: 80,
         recommendation: {
-          action: 'start push day',
-          reason: 'planned session still open',
-          type: 'workout',
+          action: "start push day",
+          reason: "planned session still open",
+          type: "workout",
         },
-        remainingItems: [{ title: 'push day', action: 'workout' }],
+        remainingItems: [{ title: "push day", action: "workout" }],
       }),
     ).toEqual({
-      type: 'next',
-      label: 'next',
-      title: 'push day',
-      meta: '6:30 · 5 lifts · 17 sets · ~47 min',
-      action: 'start now',
-      detail: 'walk · ten min · sun is out',
+      type: "next",
+      label: "next",
+      title: "push day",
+      meta: "6:30 · 5 lifts · 17 sets · ~47 min",
+      action: "start now",
+      detail: "walk · ten min · sun is out",
     });
   });
 });

@@ -1,10 +1,10 @@
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
 export const colors = {
-  background: '#000000',
-  foreground: '#ffffff',
-  success: '#9fe6b4',
-  warning: '#f2c675',
+  background: "#000000",
+  foreground: "#ffffff",
+  success: "#9fe6b4",
+  warning: "#f2c675",
 };
 
 export const opacity = {
@@ -28,7 +28,7 @@ export const spacing = {
 };
 
 export const typography = {
-  mono: Platform.select({ ios: 'SF Mono', default: 'monospace' }),
+  mono: Platform.select({ ios: "SF Mono", default: "monospace" }),
 };
 
 export const typeScale = {
