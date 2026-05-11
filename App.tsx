@@ -110,6 +110,15 @@ function formatTimestampDate(timestamp: number) {
   return formatDateKey(new Date(timestamp));
 }
 
+function formatWorkoutPlanMeta(plan: WorkoutPlan) {
+  const totalSets = plan.exercises.reduce(
+    (sets, exercise) => sets + exercise.targetSets,
+    0,
+  );
+
+  return `${plan.exercises.length} lifts · ${totalSets} sets`;
+}
+
 type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan";
@@ -409,7 +418,9 @@ function HomeMiddleSurface({
         <PressableScale onPress={onWorkout} hitSlop={12}>
           <Text style={styles.nextStart}>{middle.action}</Text>
         </PressableScale>
-        <Text style={styles.supporting}>{middle.detail}</Text>
+        {middle.detail ? (
+          <Text style={styles.supporting}>{middle.detail}</Text>
+        ) : null}
       </View>
     );
   }
@@ -875,6 +886,7 @@ function Home() {
     minutesWorked: today.focusMinutes,
     recommendation,
     remainingItems: openItems,
+    workoutMeta: formatWorkoutPlanMeta(workoutPlan),
   });
   const stepGoalLabel = today.stepGoal.toLocaleString();
 

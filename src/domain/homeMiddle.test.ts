@@ -59,14 +59,14 @@ describe("chooseHomeMiddle", () => {
           type: "workout",
         },
         remainingItems: [{ title: "push day", action: "workout" }],
+        workoutMeta: "5 lifts · 16 sets",
       }),
     ).toEqual({
       type: "next",
       label: "next",
       title: "push day",
-      meta: "6:30 · 5 lifts · 17 sets · ~47 min",
+      meta: "5 lifts · 16 sets",
       action: "start now",
-      detail: "walk · ten min · sun is out",
     });
   });
 });

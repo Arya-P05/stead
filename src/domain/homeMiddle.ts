@@ -23,17 +23,19 @@ export type HomeMiddle =
       title: string;
       meta: string;
       action: string;
-      detail: string;
+      detail?: string;
     };
 
 export function chooseHomeMiddle({
   minutesWorked,
   recommendation,
   remainingItems,
+  workoutMeta,
 }: {
   minutesWorked: number;
   recommendation: Recommendation;
   remainingItems: RemainingItem[];
+  workoutMeta?: string;
 }): HomeMiddle {
   if (recommendation.type === "walk" && minutesWorked >= 180) {
     return {
@@ -49,9 +51,8 @@ export function chooseHomeMiddle({
       type: "next",
       label: "next",
       title: recommendation.action.replace("start ", ""),
-      meta: "6:30 · 5 lifts · 17 sets · ~47 min",
+      meta: workoutMeta ?? "planned workout",
       action: "start now",
-      detail: "walk · ten min · sun is out",
     };
   }
 
