@@ -38,8 +38,8 @@ export async function loadAppState(
 }
 
 export async function saveAppState(
-  storage: StorageAdapter = appStorage,
   state: AppState,
+  storage: StorageAdapter = appStorage,
 ): Promise<void> {
   await storage.setItem(APP_STATE_KEY, JSON.stringify(state));
 }

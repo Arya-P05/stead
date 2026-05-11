@@ -1,4 +1,4 @@
-import { syncTodaySteps } from "./healthkit";
+import { syncTodaySteps, syncTodayStepsWithStatus } from "./healthkit";
 
 describe("syncTodaySteps", () => {
   it("requests HealthKit access and returns today steps", async () => {
@@ -23,6 +23,18 @@ describe("syncTodaySteps", () => {
     };
 
     await expect(syncTodaySteps(adapter)).resolves.toBeNull();
+    expect(adapter.readTodaySteps).not.toHaveBeenCalled();
+  });
+
+  it("returns a denied status when authorization fails", async () => {
+    const adapter = {
+      requestStepAuthorization: jest.fn(async () => false),
+      readTodaySteps: jest.fn(async () => 7124),
+    };
+
+    await expect(syncTodayStepsWithStatus(adapter)).resolves.toEqual({
+      status: "denied",
+    });
     expect(adapter.readTodaySteps).not.toHaveBeenCalled();
   });
 });

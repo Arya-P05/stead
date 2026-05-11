@@ -5,6 +5,7 @@ import {
   clearActiveWorkoutSession,
   createInitialAppState,
   hasCompletedWorkout,
+  hasCompletedWorkoutOnDate,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
   upsertExerciseWeight,
@@ -93,6 +94,25 @@ describe("app state", () => {
 
     expect(hasCompletedWorkout(state, "push-day")).toBe(true);
     expect(hasCompletedWorkout(state, "pull-day")).toBe(false);
+  });
+
+  it("knows when a workout has been completed on a specific day", () => {
+    const state = addWorkoutOutcome(createInitialAppState(), {
+      id: "a",
+      planId: "push-day",
+      name: "push day",
+      startedAt: new Date("2026-05-10T20:00:00").getTime(),
+      completedAt: new Date("2026-05-10T21:00:00").getTime(),
+      totalSets: 17,
+      exercises: [],
+    });
+
+    expect(hasCompletedWorkoutOnDate(state, "push-day", "2026-05-10")).toBe(
+      true,
+    );
+    expect(hasCompletedWorkoutOnDate(state, "push-day", "2026-05-11")).toBe(
+      false,
+    );
   });
 
   it("saves and clears an active workout session", () => {

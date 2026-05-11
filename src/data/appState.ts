@@ -93,6 +93,18 @@ export function hasCompletedWorkout(state: AppState, planId: string) {
   return state.workoutOutcomes.some((outcome) => outcome.planId === planId);
 }
 
+export function hasCompletedWorkoutOnDate(
+  state: AppState,
+  planId: string,
+  date: string,
+) {
+  return state.workoutOutcomes.some(
+    (outcome) =>
+      outcome.planId === planId &&
+      formatDateKey(new Date(outcome.completedAt)) === date,
+  );
+}
+
 export function saveActiveWorkoutSession(
   state: AppState,
   session: WorkoutSession,
@@ -149,4 +161,12 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
       ),
     ].sort((a, b) => b.capturedAt - a.capturedAt),
   };
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }

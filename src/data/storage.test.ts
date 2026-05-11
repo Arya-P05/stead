@@ -89,7 +89,7 @@ describe("storage", () => {
       ],
     };
 
-    await saveAppState(storage, state);
+    await saveAppState(state, storage);
 
     await expect(loadAppState(storage)).resolves.toEqual(state);
   });

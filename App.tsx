@@ -2,9 +2,9 @@ import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
 import {
+  AppState as NativeAppState,
   Modal,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,7 +18,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   colors,
   opacity,
@@ -52,7 +52,7 @@ import {
   addStepSample,
   clearActiveWorkoutSession,
   createInitialAppState,
-  hasCompletedWorkout,
+  hasCompletedWorkoutOnDate,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
   upsertExerciseWeight,
@@ -62,7 +62,7 @@ import { loadAppState, saveAppState } from "./src/data/storage";
 import { createWorkoutOutcome } from "./src/data/workoutOutcome";
 import { createCalendarMonth } from "./src/data/calendarDays";
 import type { CalendarMonth } from "./src/data/calendarDays";
-import { syncTodaySteps } from "./src/services/healthkit";
+import { syncTodayStepsWithStatus } from "./src/services/healthkit";
 import {
   createDefaultWorkoutPlan,
   normalizeWorkoutPlan,
@@ -73,24 +73,30 @@ import {
   parseWorkoutVoiceLog,
 } from "./src/domain/voiceLog";
 
-const today = {
-  date: formatDateKey(new Date()),
-  dateLabel: new Date()
-    .toLocaleDateString("en-US", { weekday: "long" })
-    .toLowerCase(),
-  dateMeta: new Date()
-    .toLocaleDateString("en-US", { month: "long", day: "numeric" })
-    .toLowerCase(),
-  stepGoal: 10000,
-  focusMinutes: 154,
-  workout: "push day",
-  minutesUntilNextEvent: 90,
-  weather: {
-    condition: "sunny" as const,
-    temperatureF: 72,
-    precipitationChance: 0.05,
-  },
-};
+const STEP_GOAL = 10000;
+
+function createTodayContext(date = new Date()) {
+  return {
+    date: formatDateKey(date),
+    dateLabel: date
+      .toLocaleDateString("en-US", { weekday: "long" })
+      .toLowerCase(),
+    dateMeta: date
+      .toLocaleDateString("en-US", { month: "long", day: "numeric" })
+      .toLowerCase(),
+    stepGoal: STEP_GOAL,
+    focusMinutes: 154,
+    workout: "push day",
+    minutesUntilNextEvent: 90,
+    weather: {
+      condition: "sunny" as const,
+      temperatureF: 72,
+      precipitationChance: 0.05,
+    },
+  };
+}
+
+type TodayContext = ReturnType<typeof createTodayContext>;
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
@@ -104,31 +110,8 @@ function formatTimestampDate(timestamp: number) {
   return formatDateKey(new Date(timestamp));
 }
 
-type DayItem = {
-  title: string;
-  detail: string;
-  time: string;
-  active?: boolean;
-  action?: "workout";
-};
-
-const dayItems: DayItem[] = [
-  { title: "walk", detail: "ten min", time: "8:30" },
-  { title: "focus", detail: "2h 14m", time: "9:00" },
-  { title: "walk", detail: "ten min", time: "12:30" },
-  { title: "lunch", detail: "20 min", time: "1:00" },
-  { title: "focus", detail: "in flow", time: "now", active: true },
-  { title: "push day", detail: "47 min", time: "6:30", action: "workout" },
-  { title: "read", detail: "30 min", time: "9:00" },
-];
-
-const remainingItems = [
-  { title: "walk" },
-  { title: "push day", action: "workout" as const },
-  { title: "read" },
-];
-
 type FeedbackState = "idle" | "success" | "warning";
+type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan";
 type Surface = "home" | "calendar" | "day";
 
@@ -217,43 +200,6 @@ function IndexText({
   );
 }
 
-function DayRow({
-  index,
-  item,
-  onWorkout,
-}: {
-  index: number;
-  item: DayItem;
-  onWorkout: () => void;
-}) {
-  const row = (
-    <View style={styles.dayRow}>
-      <IndexText active={item.active}>
-        {String(index + 1).padStart(2, "0")}
-      </IndexText>
-      <View style={styles.dayCopy}>
-        <Text style={[styles.dayTitle, item.active && styles.activeText]}>
-          {item.title}
-        </Text>
-        <Text style={styles.dayDetail}>{item.detail}</Text>
-      </View>
-      <Text style={[styles.dayTime, item.active && styles.activeText]}>
-        {item.time}
-      </Text>
-    </View>
-  );
-
-  if (item.action === "workout") {
-    return (
-      <PressableScale onPress={onWorkout} hitSlop={8}>
-        {row}
-      </PressableScale>
-    );
-  }
-
-  return row;
-}
-
 function DaySurface({
   loggedSets,
   onBack,
@@ -261,6 +207,7 @@ function DaySurface({
   selectedDate,
   selectedOutcome,
   selectedWorkoutOutcome,
+  today,
 }: {
   loggedSets: number;
   onBack: () => void;
@@ -268,6 +215,7 @@ function DaySurface({
   selectedDate: string;
   selectedOutcome?: AppState["dailyOutcomes"][number];
   selectedWorkoutOutcome?: AppState["workoutOutcomes"][number];
+  today: TodayContext;
 }) {
   const isToday = selectedDate === today.date;
 
@@ -291,7 +239,7 @@ function DaySurface({
             ? `${selectedWorkoutOutcome.totalSets} sets`
             : loggedSets > 0
               ? `${loggedSets} logged`
-              : "5 / 7"}
+              : ""}
         </Text>
       </View>
 
@@ -327,21 +275,25 @@ function DaySurface({
           ))}
         </View>
       ) : (
-        <View style={styles.dayList}>
-          {dayItems.map((item, index) => (
-            <DayRow
-              key={`${item.title}-${index}`}
-              index={index}
-              item={item}
-              onWorkout={onWorkout}
-            />
-          ))}
+        <View style={styles.emptyDay}>
+          <Text style={styles.homeMeta}>
+            {isToday ? "nothing logged yet" : "empty day"}
+          </Text>
+          <Text style={styles.momentPhrase}>
+            {isToday
+              ? "start a workout or mark one of today's actions when you do it."
+              : "no outcomes were saved for this date."}
+          </Text>
+          {isToday ? (
+            <PressableScale onPress={onWorkout} hitSlop={12}>
+              <Text style={styles.momentAction}>start workout</Text>
+            </PressableScale>
+          ) : null}
         </View>
       )}
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
-        <ActionText onPress={() => undefined}>plan tomorrow</ActionText>
       </View>
     </View>
   );
@@ -479,20 +431,8 @@ function HomeMiddleSurface({
             <Text style={styles.indexText}>
               {String(index + 1).padStart(2, "0")}
             </Text>
-            <Text
-              style={[
-                styles.todayThreeTitle,
-                index > 0 && styles.untrackedText,
-              ]}
-            >
-              {item.title}
-            </Text>
-            <Text
-              style={[
-                styles.todayThreeAction,
-                index > 0 && styles.untrackedText,
-              ]}
-            >
+            <Text style={styles.todayThreeTitle}>{item.title}</Text>
+            <Text style={styles.todayThreeAction}>
               {item.action === "workout" ? "start" : "do"}
             </Text>
           </PressableScale>
@@ -872,6 +812,7 @@ function WorkoutSurface({
 }
 
 function Home() {
+  const [today, setToday] = useState(() => createTodayContext());
   const [appState, setAppState] = useState<AppState>(() =>
     createInitialAppState(),
   );
@@ -882,8 +823,10 @@ function Home() {
       fadeOutMs: 280,
       fadeInMs: 420,
     });
-  const [selectedDate, setSelectedDate] = useState(today.date);
-  const [visibleMonthDate, setVisibleMonthDate] = useState(today.date);
+  const [selectedDate, setSelectedDate] = useState(() => today.date);
+  const [visibleMonthDate, setVisibleMonthDate] = useState(() => today.date);
+  const [healthSyncStatus, setHealthSyncStatus] =
+    useState<HealthSyncStatus>("idle");
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(createDefaultWorkoutPlan(), Date.now()),
@@ -892,7 +835,11 @@ function Home() {
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
-  const workoutComplete = hasCompletedWorkout(appState, workoutPlan.id);
+  const workoutComplete = hasCompletedWorkoutOnDate(
+    appState,
+    workoutPlan.id,
+    today.date,
+  );
   const calendarMonth = createCalendarMonth(
     appState.dailyOutcomes,
     today.date,
@@ -916,14 +863,20 @@ function Home() {
       name: workoutPlan.name,
     },
   });
+  const plannedItems = [
+    { title: "walk" },
+    { title: workoutPlan.name, action: "workout" as const },
+    { title: "read" },
+  ];
   const openItems = workoutComplete
-    ? remainingItems.filter((item) => item.title !== workoutPlan.name)
-    : remainingItems;
+    ? plannedItems.filter((item) => item.title !== workoutPlan.name)
+    : plannedItems;
   const homeMiddle = chooseHomeMiddle({
     minutesWorked: today.focusMinutes,
     recommendation,
     remainingItems: openItems,
   });
+  const stepGoalLabel = today.stepGoal.toLocaleString();
 
   useEffect(() => {
     let cancelled = false;
@@ -944,20 +897,54 @@ function Home() {
   }, []);
 
   useEffect(() => {
+    const refreshToday = () => {
+      const nextToday = createTodayContext();
+
+      setToday((currentToday) =>
+        currentToday.date === nextToday.date ? currentToday : nextToday,
+      );
+    };
+
+    refreshToday();
+
+    const interval = setInterval(refreshToday, 60 * 1000);
+    const subscription = NativeAppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState === "active") {
+          refreshToday();
+        }
+      },
+    );
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (hydrated) {
-      saveAppState(undefined, appState);
+      void saveAppState(appState);
     }
   }, [appState, hydrated]);
 
   const syncHealthSteps = () => {
+    setHealthSyncStatus("syncing");
+
     void import("./src/services/healthkitNative")
-      .then(({ healthKitAdapter }) => syncTodaySteps(healthKitAdapter))
-      .then((sample) => {
-        if (sample) {
-          setAppState((state) => addStepSample(state, sample));
+      .then(({ healthKitAdapter }) =>
+        syncTodayStepsWithStatus(healthKitAdapter),
+      )
+      .then((result) => {
+        if (result.status === "success") {
+          setAppState((state) => addStepSample(state, result.sample));
+          setHealthSyncStatus("synced");
+        } else {
+          setHealthSyncStatus("denied");
         }
       })
-      .catch(() => undefined);
+      .catch(() => setHealthSyncStatus("error"));
   };
 
   const logWorkoutSet = () => {
@@ -998,11 +985,16 @@ function Home() {
     setWorkoutVisible(false);
   };
   const completeLooseItem = (title: string) => {
+    const plannedCount = Math.max(openItems.length, 1);
+
     setAppState((state) =>
       addDailyOutcome(state, {
         date: today.date,
-        completedItems: Math.min((selectedOutcome?.completedItems ?? 5) + 1, 7),
-        plannedItems: 7,
+        completedItems: Math.min(
+          (selectedOutcome?.completedItems ?? 0) + 1,
+          plannedCount,
+        ),
+        plannedItems: plannedCount,
         steps: latestSteps,
         focusMinutes: today.focusMinutes,
         note: `${title} done`,
@@ -1011,13 +1003,17 @@ function Home() {
   };
   const finishWorkout = () => {
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
+    const plannedCount = Math.max(openItems.length, 1);
 
     setAppState((state) => {
       const withWorkout = addWorkoutOutcome(state, outcome);
       const withDailyOutcome = addDailyOutcome(withWorkout, {
         date: today.date,
-        completedItems: 6,
-        plannedItems: 7,
+        completedItems: Math.min(
+          (selectedOutcome?.completedItems ?? 0) + 1,
+          plannedCount,
+        ),
+        plannedItems: plannedCount,
         steps: latestSteps,
         focusMinutes: today.focusMinutes,
         note: `${outcome.name} logged`,
@@ -1084,8 +1080,20 @@ function Home() {
                 <Text style={styles.indexText}>steps</Text>
                 {latestSteps > 0 ? (
                   <Text style={styles.monoMeta}>
-                    {latestSteps.toLocaleString()} / 10,000
+                    {latestSteps.toLocaleString()} / {stepGoalLabel}
                   </Text>
+                ) : healthSyncStatus === "syncing" ? (
+                  <Text style={styles.monoMeta}>syncing</Text>
+                ) : healthSyncStatus === "synced" ? (
+                  <Text style={[styles.monoMeta, styles.successText]}>
+                    synced
+                  </Text>
+                ) : healthSyncStatus === "denied" ? (
+                  <Text style={styles.monoMeta}>health denied</Text>
+                ) : healthSyncStatus === "error" ? (
+                  <ActionText tone="warning" onPress={syncHealthSteps}>
+                    retry
+                  </ActionText>
                 ) : (
                   <ActionText onPress={syncHealthSteps}>connect</ActionText>
                 )}
@@ -1121,6 +1129,7 @@ function Home() {
             selectedDate={selectedDate}
             selectedOutcome={selectedOutcome}
             selectedWorkoutOutcome={selectedWorkoutOutcome}
+            today={today}
           />
         )}
       </Animated.View>
@@ -1445,6 +1454,11 @@ const styles = StyleSheet.create({
   dayList: {
     gap: 24,
     paddingTop: 64,
+  },
+  emptyDay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingBottom: 84,
   },
   dayRow: {
     alignItems: "center",
