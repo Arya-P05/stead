@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.patelarya.stead",
+      "bundleIdentifier": "com.aryap.stead",
       "appleTeamId": "547SCMFGR9"
     },
     "plugins": [
@@ -34,7 +34,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.patelarya.stead"
+      "package": "com.aryap.stead"
     },
     "web": {
       "favicon": "./assets/favicon.png"
