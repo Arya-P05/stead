@@ -4,19 +4,19 @@ Drop-in SVGs for the app, marketing site, and dev tooling.
 
 ## Files
 
-| file | use |
-| --- | --- |
-| `wordmark.svg` | primary wordmark, transparent bg |
-| `wordmark-dark.svg` | wordmark on black plate |
-| `wordmark-light.svg` | wordmark on white plate |
-| `wordmark-pulse.svg` | wordmark + animated green pulse (animation in SVG) |
-| `wordmark-anchor.svg` | wordmark with baseline rule |
-| `wordmark-block.svg` | block + wordmark lockup |
-| `monogram-s.svg` | single-letter mark (transparent bg) |
-| `icon-app-dark.svg` | iOS app icon, 1024×1024, dark |
-| `icon-app-light.svg` | iOS app icon, 1024×1024, light |
-| `icon-monogram.svg` | iOS app icon, 1024×1024, monogram |
-| `icon-pulse.svg` | iOS app icon, 1024×1024, with pulse |
+| file                  | use                                                |
+| --------------------- | -------------------------------------------------- |
+| `wordmark.svg`        | primary wordmark, transparent bg                   |
+| `wordmark-dark.svg`   | wordmark on black plate                            |
+| `wordmark-light.svg`  | wordmark on white plate                            |
+| `wordmark-pulse.svg`  | wordmark + animated green pulse (animation in SVG) |
+| `wordmark-anchor.svg` | wordmark with baseline rule                        |
+| `wordmark-block.svg`  | block + wordmark lockup                            |
+| `monogram-s.svg`      | single-letter mark (transparent bg)                |
+| `icon-app-dark.svg`   | iOS app icon, 1024×1024, dark                      |
+| `icon-app-light.svg`  | iOS app icon, 1024×1024, light                     |
+| `icon-monogram.svg`   | iOS app icon, 1024×1024, monogram                  |
+| `icon-pulse.svg`      | iOS app icon, 1024×1024, with pulse                |
 
 ## Spec
 

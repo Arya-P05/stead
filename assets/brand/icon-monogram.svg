@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>stead — app icon · monogram</title>
-  <rect width="1024" height="1024" rx="230" fill="#ffffff"></rect>
-  <text x="512" y="755" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, &#39;SF Pro Display&#39;, &#39;SF Pro Text&#39;, system-ui, sans-serif" font-size="820" font-weight="500" letter-spacing="-20" fill="#000000">s</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><title>stead — app icon · monogram</title><rect width="1024" height="1024" fill="#fff" rx="230"/><text x="512" y="755" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif" font-size="820" font-weight="500" letter-spacing="-20" text-anchor="middle">s</text></svg>
