@@ -1,4 +1,4 @@
-import type { DailyOutcome } from './appState';
+import type { DailyOutcome } from "./appState";
 
 export type CalendarDay = {
   date: string;
@@ -15,18 +15,18 @@ export type CalendarMonth = {
 };
 
 const monthNames = [
-  'january',
-  'february',
-  'march',
-  'april',
-  'may',
-  'june',
-  'july',
-  'august',
-  'september',
-  'october',
-  'november',
-  'december',
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
 ];
 
 export function createCalendarMonth(

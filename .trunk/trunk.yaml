@@ -1,0 +1,63 @@
+# This file controls the behavior of Trunk: https://docs.trunk.io/cli
+# To learn more about the format of this file, see https://docs.trunk.io/reference/trunk-yaml
+version: 0.1
+cli:
+  version: 1.25.0
+# Trunk provides extensibility via plugins. (https://docs.trunk.io/plugins)
+plugins:
+  sources:
+    - id: trunk
+      ref: v1.9.0
+      uri: https://github.com/trunk-io/plugins
+# Many linters and tools depend on runtimes - configure them here. (https://docs.trunk.io/runtimes)
+runtimes:
+  enabled:
+    - node@22.16.0
+    - python@3.14.4
+# This is the section where you manage your linters. (https://docs.trunk.io/check/configuration)
+# Upstream oxipng only ships an x86_64 macOS binary; Apple Silicon needs an arm64 build (Trunk
+# uses cpu key `arm_64`) or Rosetta. Without this, trunk-fmt-pre-commit fails on Apple Silicon
+# with "A tool failed to run".
+lint:
+  downloads:
+    - name: oxipng
+      downloads:
+        - os: macos
+          cpu: arm_64
+          url: https://github.com/shssoichiro/oxipng/releases/download/v${version}/oxipng-${version}-aarch64-apple-darwin.tar.gz
+          strip_components: 1
+        - os: macos
+          cpu: x86_64
+          url: https://github.com/shssoichiro/oxipng/releases/download/v${version}/oxipng-${version}-x86_64-apple-darwin.tar.gz
+          strip_components: 1
+        - os: linux
+          cpu: x86_64
+          url: https://github.com/shssoichiro/oxipng/releases/download/v${version}/oxipng-${version}-x86_64-unknown-linux-musl.tar.gz
+          strip_components: 1
+        - os: windows
+          version: ">=9.0.0"
+          cpu: x86_64
+          url: https://github.com/shssoichiro/oxipng/releases/download/v${version}/oxipng-${version}-x86_64-pc-windows-msvc.zip
+          strip_components: 1
+        - os: windows
+          cpu: x86_64
+          url: https://github.com/shssoichiro/oxipng/releases/download/v${version}/oxipng-${version}-x86_64-pc-windows-msvc.zip
+          strip_components: 1
+  enabled:
+    - actionlint@1.7.12
+    - checkov@3.2.528
+    - git-diff-check
+    - grype@0.112.0
+    - markdownlint@0.48.0
+    - osv-scanner@2.3.8
+    - oxipng@10.1.1
+    - prettier@3.8.3
+    - svgo@4.0.1
+    - trufflehog@3.95.2
+    - yamllint@1.38.0
+actions:
+  enabled:
+    - trunk-announce
+    - trunk-check-pre-push
+    - trunk-fmt-pre-commit
+    - trunk-upgrade-available

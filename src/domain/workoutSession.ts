@@ -37,9 +37,12 @@ export type ExerciseProgress = {
   complete: boolean;
 };
 
-export function startWorkoutSession(plan: WorkoutPlan, now: number): WorkoutSession {
+export function startWorkoutSession(
+  plan: WorkoutPlan,
+  now: number,
+): WorkoutSession {
   if (plan.exercises.length === 0) {
-    throw new Error('workout plan needs at least one exercise');
+    throw new Error("workout plan needs at least one exercise");
   }
 
   return {
@@ -61,7 +64,9 @@ export function getExerciseProgress(
   session: WorkoutSession,
 ): ExerciseProgress[] {
   return plan.exercises.map((exercise) => {
-    const completedSets = session.sets.filter((set) => set.exerciseId === exercise.id).length;
+    const completedSets = session.sets.filter(
+      (set) => set.exerciseId === exercise.id,
+    ).length;
 
     return {
       exerciseId: exercise.id,
@@ -135,7 +140,10 @@ export function completeSet(
     ...session,
     activeExerciseIndex: nextExerciseIndex,
     completedAt: completedWorkout ? now : null,
-    restEndsAt: completedExercise || completedWorkout ? null : now + activeExercise.restSeconds * 1000,
+    restEndsAt:
+      completedExercise || completedWorkout
+        ? null
+        : now + activeExercise.restSeconds * 1000,
     sets,
   };
 }
@@ -159,7 +167,10 @@ export function skipRest(session: WorkoutSession): WorkoutSession {
   };
 }
 
-export function addRestTime(session: WorkoutSession, seconds: number): WorkoutSession {
+export function addRestTime(
+  session: WorkoutSession,
+  seconds: number,
+): WorkoutSession {
   if (session.completedAt !== null || session.restEndsAt === null) {
     return session;
   }

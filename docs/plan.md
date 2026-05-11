@@ -2,9 +2,7 @@
 
 ## name
 
-**stead**
-
-Short for staying steady. It fits the minimal, lowercase feel of `glance` while being more personal and durable. The app should feel like a calm personal EA: aware of your day, your goals, and your energy, but never loud.
+The product name is **stead**. Short for staying steady. It fits the minimal, lowercase feel of `glance` while being more personal and durable. The app should feel like a calm personal EA: aware of your day, your goals, and your energy, but never loud.
 
 ## product thesis
 

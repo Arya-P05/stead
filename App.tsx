@@ -1,7 +1,15 @@
-import { StatusBar } from 'expo-status-bar';
-import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
-import { Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StatusBar } from "expo-status-bar";
+import * as Haptics from "expo-haptics";
+import { useEffect, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import Animated, {
   Easing,
   FadeIn,
@@ -9,14 +17,24 @@ import Animated, {
   useSharedValue,
   withSequence,
   withTiming,
-} from 'react-native-reanimated';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { colors, opacity, spacing, typeScale, typography } from './src/designSystem';
-import { AnimatedProgressFill, PressableScale, PulsingDot } from './src/ui/motion';
-import { useSequentialCrossfade } from './src/ui/sequentialCrossfade';
-import { chooseRecommendation } from './src/domain/recommendations';
-import { chooseHomeMiddle } from './src/domain/homeMiddle';
-import type { HomeMiddle } from './src/domain/homeMiddle';
+} from "react-native-reanimated";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  colors,
+  opacity,
+  spacing,
+  typeScale,
+  typography,
+} from "./src/designSystem";
+import {
+  AnimatedProgressFill,
+  PressableScale,
+  PulsingDot,
+} from "./src/ui/motion";
+import { useSequentialCrossfade } from "./src/ui/sequentialCrossfade";
+import { chooseRecommendation } from "./src/domain/recommendations";
+import { chooseHomeMiddle } from "./src/domain/homeMiddle";
+import type { HomeMiddle } from "./src/domain/homeMiddle";
 import {
   addRestTime,
   completeSet,
@@ -26,8 +44,8 @@ import {
   selectExercise,
   skipRest,
   startWorkoutSession,
-} from './src/domain/workoutSession';
-import type { WorkoutPlan, WorkoutSession } from './src/domain/workoutSession';
+} from "./src/domain/workoutSession";
+import type { WorkoutPlan, WorkoutSession } from "./src/domain/workoutSession";
 import {
   addDailyOutcome,
   addWorkoutOutcome,
@@ -38,26 +56,37 @@ import {
   saveActiveWorkoutSession,
   saveWorkoutPlan,
   upsertExerciseWeight,
-} from './src/data/appState';
-import type { AppState } from './src/data/appState';
-import { loadAppState, saveAppState } from './src/data/storage';
-import { createWorkoutOutcome } from './src/data/workoutOutcome';
-import { createCalendarMonth } from './src/data/calendarDays';
-import type { CalendarMonth } from './src/data/calendarDays';
-import { syncTodaySteps } from './src/services/healthkit';
-import { createDefaultWorkoutPlan, normalizeWorkoutPlan, updateExercise } from './src/data/workoutPlan';
-import { applyWorkoutVoiceLog, parseWorkoutVoiceLog } from './src/domain/voiceLog';
+} from "./src/data/appState";
+import type { AppState } from "./src/data/appState";
+import { loadAppState, saveAppState } from "./src/data/storage";
+import { createWorkoutOutcome } from "./src/data/workoutOutcome";
+import { createCalendarMonth } from "./src/data/calendarDays";
+import type { CalendarMonth } from "./src/data/calendarDays";
+import { syncTodaySteps } from "./src/services/healthkit";
+import {
+  createDefaultWorkoutPlan,
+  normalizeWorkoutPlan,
+  updateExercise,
+} from "./src/data/workoutPlan";
+import {
+  applyWorkoutVoiceLog,
+  parseWorkoutVoiceLog,
+} from "./src/domain/voiceLog";
 
 const today = {
   date: formatDateKey(new Date()),
-  dateLabel: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
-  dateMeta: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toLowerCase(),
+  dateLabel: new Date()
+    .toLocaleDateString("en-US", { weekday: "long" })
+    .toLowerCase(),
+  dateMeta: new Date()
+    .toLocaleDateString("en-US", { month: "long", day: "numeric" })
+    .toLowerCase(),
   stepGoal: 10000,
   focusMinutes: 154,
-  workout: 'push day',
+  workout: "push day",
   minutesUntilNextEvent: 90,
   weather: {
-    condition: 'sunny' as const,
+    condition: "sunny" as const,
     temperatureF: 72,
     precipitationChance: 0.05,
   },
@@ -65,8 +94,8 @@ const today = {
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
@@ -80,31 +109,34 @@ type DayItem = {
   detail: string;
   time: string;
   active?: boolean;
-  action?: 'workout';
+  action?: "workout";
 };
 
 const dayItems: DayItem[] = [
-  { title: 'walk', detail: 'ten min', time: '8:30' },
-  { title: 'focus', detail: '2h 14m', time: '9:00' },
-  { title: 'walk', detail: 'ten min', time: '12:30' },
-  { title: 'lunch', detail: '20 min', time: '1:00' },
-  { title: 'focus', detail: 'in flow', time: 'now', active: true },
-  { title: 'push day', detail: '47 min', time: '6:30', action: 'workout' },
-  { title: 'read', detail: '30 min', time: '9:00' },
+  { title: "walk", detail: "ten min", time: "8:30" },
+  { title: "focus", detail: "2h 14m", time: "9:00" },
+  { title: "walk", detail: "ten min", time: "12:30" },
+  { title: "lunch", detail: "20 min", time: "1:00" },
+  { title: "focus", detail: "in flow", time: "now", active: true },
+  { title: "push day", detail: "47 min", time: "6:30", action: "workout" },
+  { title: "read", detail: "30 min", time: "9:00" },
 ];
 
 const remainingItems = [
-  { title: 'walk' },
-  { title: 'push day', action: 'workout' as const },
-  { title: 'read' },
+  { title: "walk" },
+  { title: "push day", action: "workout" as const },
+  { title: "read" },
 ];
 
-type FeedbackState = 'idle' | 'success' | 'warning';
-type WorkoutMode = 'overview' | 'exercise' | 'voice' | 'plan';
-type Surface = 'home' | 'calendar' | 'day';
+type FeedbackState = "idle" | "success" | "warning";
+type WorkoutMode = "overview" | "exercise" | "voice" | "plan";
+type Surface = "home" | "calendar" | "day";
 
-function parseWorkoutVisualKey(key: string): { mode: WorkoutMode; isResting: boolean } {
-  if (key.endsWith('-true')) {
+function parseWorkoutVisualKey(key: string): {
+  mode: WorkoutMode;
+  isResting: boolean;
+} {
+  if (key.endsWith("-true")) {
     return { mode: key.slice(0, -5) as WorkoutMode, isResting: true };
   }
 
@@ -114,16 +146,16 @@ function parseWorkoutVisualKey(key: string): { mode: WorkoutMode; isResting: boo
 function ActionText({
   children,
   disabled,
-  tone = 'success',
+  tone = "success",
   onPress,
 }: {
   children: string;
   disabled?: boolean;
-  tone?: Exclude<FeedbackState, 'idle'>;
+  tone?: Exclude<FeedbackState, "idle">;
   onPress: () => void;
 }) {
   const translateY = useSharedValue(0);
-  const [feedback, setFeedback] = useState<FeedbackState>('idle');
+  const [feedback, setFeedback] = useState<FeedbackState>("idle");
   const liftStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }));
@@ -131,7 +163,7 @@ function ActionText({
   const runFeedback = async () => {
     if (disabled) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setFeedback('warning');
+      setFeedback("warning");
     } else {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setFeedback(tone);
@@ -143,13 +175,13 @@ function ActionText({
       withTiming(0, { duration: 150, easing: Easing.out(Easing.cubic) }),
     );
 
-    setTimeout(() => setFeedback('idle'), 480);
+    setTimeout(() => setFeedback("idle"), 480);
   };
 
   const color =
-    feedback === 'success'
+    feedback === "success"
       ? colors.success
-      : feedback === 'warning'
+      : feedback === "warning"
         ? colors.warning
         : colors.foreground;
 
@@ -171,8 +203,18 @@ function ActionText({
   );
 }
 
-function IndexText({ children, active }: { children: string; active?: boolean }) {
-  return <Text style={[styles.indexText, active && styles.activeText]}>{children}</Text>;
+function IndexText({
+  children,
+  active,
+}: {
+  children: string;
+  active?: boolean;
+}) {
+  return (
+    <Text style={[styles.indexText, active && styles.activeText]}>
+      {children}
+    </Text>
+  );
 }
 
 function DayRow({
@@ -186,16 +228,22 @@ function DayRow({
 }) {
   const row = (
     <View style={styles.dayRow}>
-      <IndexText active={item.active}>{String(index + 1).padStart(2, '0')}</IndexText>
+      <IndexText active={item.active}>
+        {String(index + 1).padStart(2, "0")}
+      </IndexText>
       <View style={styles.dayCopy}>
-        <Text style={[styles.dayTitle, item.active && styles.activeText]}>{item.title}</Text>
+        <Text style={[styles.dayTitle, item.active && styles.activeText]}>
+          {item.title}
+        </Text>
         <Text style={styles.dayDetail}>{item.detail}</Text>
       </View>
-      <Text style={[styles.dayTime, item.active && styles.activeText]}>{item.time}</Text>
+      <Text style={[styles.dayTime, item.active && styles.activeText]}>
+        {item.time}
+      </Text>
     </View>
   );
 
-  if (item.action === 'workout') {
+  if (item.action === "workout") {
     return (
       <PressableScale onPress={onWorkout} hitSlop={8}>
         {row}
@@ -218,8 +266,8 @@ function DaySurface({
   onBack: () => void;
   onWorkout: () => void;
   selectedDate: string;
-  selectedOutcome?: AppState['dailyOutcomes'][number];
-  selectedWorkoutOutcome?: AppState['workoutOutcomes'][number];
+  selectedOutcome?: AppState["dailyOutcomes"][number];
+  selectedWorkoutOutcome?: AppState["workoutOutcomes"][number];
 }) {
   const isToday = selectedDate === today.date;
 
@@ -227,37 +275,53 @@ function DaySurface({
     <View style={styles.calendarContent}>
       <View style={styles.dayHeader}>
         <View style={styles.titleStack}>
-          <Text style={styles.titleText}>{isToday ? today.dateLabel : selectedDate.slice(5)}</Text>
+          <Text style={styles.titleText}>
+            {isToday ? today.dateLabel : selectedDate.slice(5)}
+          </Text>
           <Text style={styles.metadataText}>
             {selectedOutcome
               ? `${selectedOutcome.completedItems} / ${selectedOutcome.plannedItems} done`
               : isToday
                 ? today.dateMeta
-                : 'no tracked outcome'}
+                : "no tracked outcome"}
           </Text>
         </View>
         <Text style={styles.monoMeta}>
-          {selectedWorkoutOutcome ? `${selectedWorkoutOutcome.totalSets} sets` : loggedSets > 0 ? `${loggedSets} logged` : '5 / 7'}
+          {selectedWorkoutOutcome
+            ? `${selectedWorkoutOutcome.totalSets} sets`
+            : loggedSets > 0
+              ? `${loggedSets} logged`
+              : "5 / 7"}
         </Text>
       </View>
 
       {selectedWorkoutOutcome ? (
         <View style={styles.dayList}>
           <View style={styles.nudgeLine}>
-            <Text style={styles.exerciseTitle}>{selectedWorkoutOutcome.name}</Text>
+            <Text style={styles.exerciseTitle}>
+              {selectedWorkoutOutcome.name}
+            </Text>
             <Text style={styles.monoMeta}>
-              {Math.round((selectedWorkoutOutcome.completedAt - selectedWorkoutOutcome.startedAt) / 60000)} min ·{' '}
-              {selectedWorkoutOutcome.exercises.length} lifts · {selectedWorkoutOutcome.totalSets} sets
+              {Math.round(
+                (selectedWorkoutOutcome.completedAt -
+                  selectedWorkoutOutcome.startedAt) /
+                  60000,
+              )}{" "}
+              min · {selectedWorkoutOutcome.exercises.length} lifts ·{" "}
+              {selectedWorkoutOutcome.totalSets} sets
             </Text>
           </View>
           {selectedWorkoutOutcome.exercises.map((exercise, index) => (
             <View key={exercise.exerciseId} style={styles.dayRow}>
-              <IndexText>{String(index + 1).padStart(2, '0')}</IndexText>
+              <IndexText>{String(index + 1).padStart(2, "0")}</IndexText>
               <View style={styles.dayCopy}>
-                <Text style={[styles.dayTitle, styles.activeText]}>{exercise.name}</Text>
+                <Text style={[styles.dayTitle, styles.activeText]}>
+                  {exercise.name}
+                </Text>
               </View>
               <Text style={styles.recapSetValue}>
-                {exercise.sets} × {exercise.reps ?? '-'}{exercise.weightLb ? ` · ${exercise.weightLb}` : ''}
+                {exercise.sets} × {exercise.reps ?? "-"}
+                {exercise.weightLb ? ` · ${exercise.weightLb}` : ""}
               </Text>
             </View>
           ))}
@@ -307,7 +371,7 @@ function CalendarSurface({
 
       <View style={styles.calendarSurface}>
         <View style={styles.weekdays}>
-          {['s', 'm', 't', 'w', 't', 'f', 's'].map((weekday, index) => (
+          {["s", "m", "t", "w", "t", "f", "s"].map((weekday, index) => (
             <View key={`${weekday}-${index}`}>
               <Text style={styles.weekdayLabel}>{weekday}</Text>
             </View>
@@ -374,7 +438,7 @@ function HomeMiddleSurface({
   onCompleteItem: (title: string) => void;
   onWorkout: () => void;
 }) {
-  if (middle.type === 'moment') {
+  if (middle.type === "moment") {
     return (
       <View style={styles.homeMiddle}>
         <Text style={styles.homeMeta}>{middle.meta}</Text>
@@ -384,7 +448,7 @@ function HomeMiddleSurface({
     );
   }
 
-  if (middle.type === 'next') {
+  if (middle.type === "next") {
     return (
       <View style={styles.homeMiddle}>
         <Text style={styles.homeMeta}>{middle.label}</Text>
@@ -405,15 +469,31 @@ function HomeMiddleSurface({
         {middle.items.map((item, index) => (
           <PressableScale
             key={`${item.title}-${index}`}
-            onPress={() => (item.action === 'workout' ? onWorkout() : onCompleteItem(item.title))}
+            onPress={() =>
+              item.action === "workout"
+                ? onWorkout()
+                : onCompleteItem(item.title)
+            }
             style={styles.todayThreeRow}
           >
-            <Text style={styles.indexText}>{String(index + 1).padStart(2, '0')}</Text>
-            <Text style={[styles.todayThreeTitle, index > 0 && styles.untrackedText]}>
+            <Text style={styles.indexText}>
+              {String(index + 1).padStart(2, "0")}
+            </Text>
+            <Text
+              style={[
+                styles.todayThreeTitle,
+                index > 0 && styles.untrackedText,
+              ]}
+            >
               {item.title}
             </Text>
-            <Text style={[styles.todayThreeAction, index > 0 && styles.untrackedText]}>
-              {item.action === 'workout' ? 'start' : 'do'}
+            <Text
+              style={[
+                styles.todayThreeAction,
+                index > 0 && styles.untrackedText,
+              ]}
+            >
+              {item.action === "workout" ? "start" : "do"}
             </Text>
           </PressableScale>
         ))}
@@ -428,7 +508,7 @@ function FormatTimer({ seconds }: { seconds: number }) {
 
   return (
     <Text style={styles.restTimer}>
-      {minutes}:{String(remainingSeconds).padStart(2, '0')}
+      {minutes}:{String(remainingSeconds).padStart(2, "0")}
     </Text>
   );
 }
@@ -456,11 +536,14 @@ function WorkoutSurface({
   onLogVoice: (transcript: string) => boolean;
   onSelectExercise: (index: number) => void;
   onSkipRest: () => void;
-  onUpdateExercise: (exerciseId: string, patch: Parameters<typeof updateExercise>[2]) => void;
+  onUpdateExercise: (
+    exerciseId: string,
+    patch: Parameters<typeof updateExercise>[2],
+  ) => void;
 }) {
   const [now, setNow] = useState(Date.now());
-  const [mode, setMode] = useState<WorkoutMode>('overview');
-  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [mode, setMode] = useState<WorkoutMode>("overview");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
   const [planExerciseIndex, setPlanExerciseIndex] = useState(0);
   const activeExercise = getActiveExercise(plan, session);
   const exerciseProgress = getExerciseProgress(plan, session);
@@ -469,11 +552,15 @@ function WorkoutSurface({
   const completedSets = activeExercise
     ? session.sets.filter((set) => set.exerciseId === activeExercise.id).length
     : 0;
-  const exerciseIndex = Math.min(session.activeExerciseIndex + 1, plan.exercises.length);
+  const exerciseIndex = Math.min(
+    session.activeExerciseIndex + 1,
+    plan.exercises.length,
+  );
   const setLabel = activeExercise
     ? `set  ${Math.min(completedSets + 1, activeExercise.targetSets)} of ${activeExercise.targetSets}`
-    : 'done';
-  const selectedPlanExercise = plan.exercises[planExerciseIndex] ?? plan.exercises[0];
+    : "done";
+  const selectedPlanExercise =
+    plan.exercises[planExerciseIndex] ?? plan.exercises[0];
   const parsedVoiceLog = parseWorkoutVoiceLog(voiceTranscript);
 
   useEffect(() => {
@@ -481,7 +568,7 @@ function WorkoutSurface({
       return undefined;
     }
 
-    setMode('overview');
+    setMode("overview");
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
 
@@ -490,7 +577,7 @@ function WorkoutSurface({
 
   useEffect(() => {
     if (isResting) {
-      setMode('exercise');
+      setMode("exercise");
     }
   }, [isResting]);
 
@@ -499,14 +586,16 @@ function WorkoutSurface({
     : `${session.sets.length} sets logged`;
 
   const workoutVisualKey = `${mode}-${isResting}`;
-  const { displayKey: workoutStageShown, animatedStyle: workoutStageOpacity } = useSequentialCrossfade(
-    workoutVisualKey,
-    { fadeOutMs: 220, fadeInMs: 360 },
-  );
+  const { displayKey: workoutStageShown, animatedStyle: workoutStageOpacity } =
+    useSequentialCrossfade(workoutVisualKey, { fadeOutMs: 220, fadeInMs: 360 });
   const stageView = parseWorkoutVisualKey(workoutStageShown);
 
   return (
-    <Modal animationType="fade" visible={visible} presentationStyle="fullScreen">
+    <Modal
+      animationType="fade"
+      visible={visible}
+      presentationStyle="fullScreen"
+    >
       <SafeAreaView style={styles.screen}>
         <StatusBar style="light" />
         <Animated.View
@@ -516,18 +605,27 @@ function WorkoutSurface({
           <View style={styles.liveHeader}>
             <Text style={styles.metadataText}>
               {plan.name}
-              {mode === 'voice' ? ' · live' : ''}
+              {mode === "voice" ? " · live" : ""}
             </Text>
             <Text style={styles.monoMeta}>
-              {mode === 'voice' ? 'dictate' : isResting ? setLabel : `${String(exerciseIndex).padStart(2, '0')}  of  ${String(plan.exercises.length).padStart(2, '0')}`}
+              {mode === "voice"
+                ? "dictate"
+                : isResting
+                  ? setLabel
+                  : `${String(exerciseIndex).padStart(2, "0")}  of  ${String(plan.exercises.length).padStart(2, "0")}`}
             </Text>
           </View>
 
           <Animated.View style={[styles.workoutStage, workoutStageOpacity]}>
-            {stageView.mode === 'overview' ? (
+            {stageView.mode === "overview" ? (
               <View style={styles.workoutOverview}>
                 <Text style={styles.metadataText}>
-                  {session.sets.length} of {plan.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0)} sets
+                  {session.sets.length} of{" "}
+                  {plan.exercises.reduce(
+                    (sum, exercise) => sum + exercise.targetSets,
+                    0,
+                  )}{" "}
+                  sets
                 </Text>
                 <View style={styles.workoutExerciseList}>
                   {plan.exercises.map((exercise, index) => {
@@ -539,12 +637,17 @@ function WorkoutSurface({
                           disabled={progress.complete}
                           onPress={() => {
                             onSelectExercise(index);
-                            setMode('exercise');
+                            setMode("exercise");
                           }}
                           style={styles.workoutExerciseRow}
                         >
-                          <IndexText active={!progress.complete && index === session.activeExerciseIndex}>
-                            {String(index + 1).padStart(2, '0')}
+                          <IndexText
+                            active={
+                              !progress.complete &&
+                              index === session.activeExerciseIndex
+                            }
+                          >
+                            {String(index + 1).padStart(2, "0")}
                           </IndexText>
                           <View style={styles.workoutExerciseCopy}>
                             <Text
@@ -556,12 +659,18 @@ function WorkoutSurface({
                               {exercise.name}
                             </Text>
                             <Text style={styles.monoMeta}>
-                              {progress.completedSets}/{exercise.targetSets} sets · {exercise.targetReps ?? 10} reps ·{' '}
+                              {progress.completedSets}/{exercise.targetSets}{" "}
+                              sets · {exercise.targetReps ?? 10} reps ·{" "}
                               {exercise.weightLb ?? 50} lb
                             </Text>
                           </View>
-                          <Text style={[styles.setNow, progress.complete && styles.successText]}>
-                            {progress.complete ? 'done' : ''}
+                          <Text
+                            style={[
+                              styles.setNow,
+                              progress.complete && styles.successText,
+                            ]}
+                          >
+                            {progress.complete ? "done" : ""}
                           </Text>
                         </PressableScale>
                       </View>
@@ -569,7 +678,7 @@ function WorkoutSurface({
                   })}
                 </View>
               </View>
-            ) : stageView.mode === 'voice' ? (
+            ) : stageView.mode === "voice" ? (
               <View style={styles.voiceSurface}>
                 <View style={styles.listeningRow}>
                   <PulsingDot style={styles.listeningDot} />
@@ -585,9 +694,11 @@ function WorkoutSurface({
                   style={styles.voiceInput}
                   value={voiceTranscript}
                 />
-                <Text style={styles.metadataText}>uses keyboard dictation today</Text>
+                <Text style={styles.metadataText}>
+                  uses keyboard dictation today
+                </Text>
               </View>
-            ) : stageView.mode === 'plan' && selectedPlanExercise ? (
+            ) : stageView.mode === "plan" && selectedPlanExercise ? (
               <View style={styles.planSurface}>
                 <Text style={styles.metadataText}>edit plan</Text>
                 <View style={styles.workoutExerciseList}>
@@ -598,7 +709,7 @@ function WorkoutSurface({
                       style={styles.workoutExerciseRow}
                     >
                       <IndexText active={index === planExerciseIndex}>
-                        {String(index + 1).padStart(2, '0')}
+                        {String(index + 1).padStart(2, "0")}
                       </IndexText>
                       <View style={styles.workoutExerciseCopy}>
                         <Text
@@ -610,7 +721,8 @@ function WorkoutSurface({
                           {exercise.name}
                         </Text>
                         <Text style={styles.monoMeta}>
-                          {exercise.targetSets} × {exercise.targetReps ?? 10} · {exercise.weightLb ?? 0} lb · {exercise.restSeconds}s
+                          {exercise.targetSets} × {exercise.targetReps ?? 10} ·{" "}
+                          {exercise.weightLb ?? 0} lb · {exercise.restSeconds}s
                         </Text>
                       </View>
                     </PressableScale>
@@ -639,53 +751,73 @@ function WorkoutSurface({
             ) : (
               <View style={styles.exerciseSurface}>
                 <View>
-                  <Text style={styles.exerciseTitle}>{activeExercise?.name ?? 'workout complete'}</Text>
+                  <Text style={styles.exerciseTitle}>
+                    {activeExercise?.name ?? "workout complete"}
+                  </Text>
                   <Text style={styles.monoMeta}>{targetLine}</Text>
                 </View>
 
                 <View style={styles.setList}>
-                  {Array.from({ length: activeExercise?.targetSets ?? 0 }).map((_, index) => {
-                    const complete = index < completedSets;
-                    const current = index === completedSets;
+                  {Array.from({ length: activeExercise?.targetSets ?? 0 }).map(
+                    (_, index) => {
+                      const complete = index < completedSets;
+                      const current = index === completedSets;
 
-                    return (
-                      <View key={index} style={styles.setRow}>
-                        <IndexText active={current}>{String(index + 1).padStart(2, '0')}</IndexText>
-                        <Text style={[styles.setValue, !complete && !current && styles.disabledText]}>
-                          {complete || current
-                            ? `${activeExercise?.targetReps ?? 10} reps · ${activeExercise?.weightLb ?? 50} lb`
-                            : '- reps · - lb'}
-                        </Text>
-                        <Text style={[styles.setNow, current && styles.successText]}>
-                          {current ? 'now' : complete ? '-' : ''}
-                        </Text>
-                      </View>
-                    );
-                  })}
+                      return (
+                        <View key={index} style={styles.setRow}>
+                          <IndexText active={current}>
+                            {String(index + 1).padStart(2, "0")}
+                          </IndexText>
+                          <Text
+                            style={[
+                              styles.setValue,
+                              !complete && !current && styles.disabledText,
+                            ]}
+                          >
+                            {complete || current
+                              ? `${activeExercise?.targetReps ?? 10} reps · ${activeExercise?.weightLb ?? 50} lb`
+                              : "- reps · - lb"}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.setNow,
+                              current && styles.successText,
+                            ]}
+                          >
+                            {current ? "now" : complete ? "-" : ""}
+                          </Text>
+                        </View>
+                      );
+                    },
+                  )}
                 </View>
               </View>
             )}
           </Animated.View>
 
           <View style={styles.bottomActions}>
-            {mode === 'voice' ? (
+            {mode === "voice" ? (
               <>
-                <ActionText onPress={() => setMode('exercise')}>back</ActionText>
+                <ActionText onPress={() => setMode("exercise")}>
+                  back
+                </ActionText>
                 <ActionText
                   disabled={!parsedVoiceLog}
                   onPress={() => {
                     if (onLogVoice(voiceTranscript)) {
-                      setVoiceTranscript('');
-                      setMode('overview');
+                      setVoiceTranscript("");
+                      setMode("overview");
                     }
                   }}
                 >
                   log
                 </ActionText>
               </>
-            ) : mode === 'plan' && selectedPlanExercise ? (
+            ) : mode === "plan" && selectedPlanExercise ? (
               <>
-                <ActionText onPress={() => setMode('overview')}>back</ActionText>
+                <ActionText onPress={() => setMode("overview")}>
+                  back
+                </ActionText>
                 <ActionText
                   onPress={() =>
                     onUpdateExercise(selectedPlanExercise.id, {
@@ -707,20 +839,28 @@ function WorkoutSurface({
               </>
             ) : isResting ? (
               <>
-                <ActionText onPress={() => setMode('overview')}>back</ActionText>
+                <ActionText onPress={() => setMode("overview")}>
+                  back
+                </ActionText>
                 <ActionText onPress={onSkipRest}>skip</ActionText>
                 <ActionText onPress={onAddRest}>+30s</ActionText>
               </>
-            ) : mode === 'overview' ? (
+            ) : mode === "overview" ? (
               <>
                 <ActionText onPress={onBack}>back</ActionText>
-                <ActionText onPress={() => setMode('plan')}>edit plan</ActionText>
-                <ActionText onPress={onFinishWorkout}>finish workout</ActionText>
+                <ActionText onPress={() => setMode("plan")}>
+                  edit plan
+                </ActionText>
+                <ActionText onPress={onFinishWorkout}>
+                  finish workout
+                </ActionText>
               </>
             ) : (
               <>
-                <ActionText onPress={() => setMode('overview')}>back</ActionText>
-                <ActionText onPress={() => setMode('voice')}>voice</ActionText>
+                <ActionText onPress={() => setMode("overview")}>
+                  back
+                </ActionText>
+                <ActionText onPress={() => setMode("voice")}>voice</ActionText>
                 <ActionText onPress={onLogSet}>log set</ActionText>
               </>
             )}
@@ -732,13 +872,16 @@ function WorkoutSurface({
 }
 
 function Home() {
-  const [appState, setAppState] = useState<AppState>(() => createInitialAppState());
+  const [appState, setAppState] = useState<AppState>(() =>
+    createInitialAppState(),
+  );
   const [hydrated, setHydrated] = useState(false);
-  const [surface, setSurfaceState] = useState<Surface>('home');
-  const { displayKey: surfaceShown, animatedStyle: surfaceOpacityStyle } = useSequentialCrossfade(surface, {
-    fadeOutMs: 280,
-    fadeInMs: 420,
-  });
+  const [surface, setSurfaceState] = useState<Surface>("home");
+  const { displayKey: surfaceShown, animatedStyle: surfaceOpacityStyle } =
+    useSequentialCrossfade(surface, {
+      fadeOutMs: 280,
+      fadeInMs: 420,
+    });
   const [selectedDate, setSelectedDate] = useState(today.date);
   const [visibleMonthDate, setVisibleMonthDate] = useState(today.date);
   const [workoutVisible, setWorkoutVisible] = useState(false);
@@ -750,8 +893,14 @@ function Home() {
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
   const workoutComplete = hasCompletedWorkout(appState, workoutPlan.id);
-  const calendarMonth = createCalendarMonth(appState.dailyOutcomes, today.date, visibleMonthDate);
-  const selectedOutcome = appState.dailyOutcomes.find((outcome) => outcome.date === selectedDate);
+  const calendarMonth = createCalendarMonth(
+    appState.dailyOutcomes,
+    today.date,
+    visibleMonthDate,
+  );
+  const selectedOutcome = appState.dailyOutcomes.find(
+    (outcome) => outcome.date === selectedDate,
+  );
   const selectedWorkoutOutcome = appState.workoutOutcomes.find(
     (outcome) => formatTimestampDate(outcome.completedAt) === selectedDate,
   );
@@ -801,7 +950,7 @@ function Home() {
   }, [appState, hydrated]);
 
   const syncHealthSteps = () => {
-    void import('./src/services/healthkitNative')
+    void import("./src/services/healthkitNative")
       .then(({ healthKitAdapter }) => syncTodaySteps(healthKitAdapter))
       .then((sample) => {
         if (sample) {
@@ -821,7 +970,12 @@ function Home() {
     });
   };
   const logWorkoutVoice = (transcript: string) => {
-    const applied = applyWorkoutVoiceLog(workoutPlan, workoutSession, transcript, Date.now());
+    const applied = applyWorkoutVoiceLog(
+      workoutPlan,
+      workoutSession,
+      transcript,
+      Date.now(),
+    );
 
     if (!applied.success) {
       return false;
@@ -892,7 +1046,11 @@ function Home() {
     setAppState((state) =>
       saveWorkoutPlan(
         state,
-        updateExercise(normalizeWorkoutPlan(state.workoutPlan), exerciseId, patch),
+        updateExercise(
+          normalizeWorkoutPlan(state.workoutPlan),
+          exerciseId,
+          patch,
+        ),
       ),
     );
   };
@@ -901,11 +1059,14 @@ function Home() {
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
       <Animated.View style={[styles.surfaceRoot, surfaceOpacityStyle]}>
-        {surfaceShown === 'home' ? (
+        {surfaceShown === "home" ? (
           <View style={styles.homeContent}>
             <View style={styles.homeHeader}>
               <Text style={styles.titleText}>stead</Text>
-              <PressableScale onPress={() => setSurfaceState('calendar')} hitSlop={10}>
+              <PressableScale
+                onPress={() => setSurfaceState("calendar")}
+                hitSlop={10}
+              >
                 <Text style={styles.metadataText}>
                   {today.dateLabel} · {today.dateMeta}
                 </Text>
@@ -922,31 +1083,40 @@ function Home() {
               <View style={styles.progressHeader}>
                 <Text style={styles.indexText}>steps</Text>
                 {latestSteps > 0 ? (
-                  <Text style={styles.monoMeta}>{latestSteps.toLocaleString()} / 10,000</Text>
+                  <Text style={styles.monoMeta}>
+                    {latestSteps.toLocaleString()} / 10,000
+                  </Text>
                 ) : (
                   <ActionText onPress={syncHealthSteps}>connect</ActionText>
                 )}
               </View>
               <View style={styles.progressTrack}>
-                <AnimatedProgressFill progress={stepProgress} style={styles.progressFill} />
+                <AnimatedProgressFill
+                  progress={stepProgress}
+                  style={styles.progressFill}
+                />
               </View>
             </View>
           </View>
-        ) : surfaceShown === 'calendar' ? (
+        ) : surfaceShown === "calendar" ? (
           <CalendarSurface
             month={calendarMonth}
-            onBack={() => setSurfaceState('home')}
-            onNextMonth={() => setVisibleMonthDate((date) => addMonths(date, 1))}
-            onPreviousMonth={() => setVisibleMonthDate((date) => addMonths(date, -1))}
+            onBack={() => setSurfaceState("home")}
+            onNextMonth={() =>
+              setVisibleMonthDate((date) => addMonths(date, 1))
+            }
+            onPreviousMonth={() =>
+              setVisibleMonthDate((date) => addMonths(date, -1))
+            }
             onSelectDate={(date) => {
               setSelectedDate(date);
-              setSurfaceState('day');
+              setSurfaceState("day");
             }}
           />
         ) : (
           <DaySurface
             loggedSets={loggedSets}
-            onBack={() => setSurfaceState('home')}
+            onBack={() => setSurfaceState("home")}
             onWorkout={() => setWorkoutVisible(true)}
             selectedDate={selectedDate}
             selectedOutcome={selectedOutcome}
@@ -963,7 +1133,9 @@ function Home() {
           setWorkoutSession((session) => {
             const nextSession = addRestTime(session, 30);
 
-            setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+            setAppState((state) =>
+              saveActiveWorkoutSession(state, nextSession),
+            );
 
             return nextSession;
           })
@@ -977,7 +1149,9 @@ function Home() {
           setWorkoutSession((session) => {
             const nextSession = skipRest(session);
 
-            setAppState((state) => saveActiveWorkoutSession(state, nextSession));
+            setAppState((state) =>
+              saveActiveWorkoutSession(state, nextSession),
+            );
 
             return nextSession;
           })
@@ -1039,7 +1213,7 @@ const styles = StyleSheet.create({
   },
   homeMiddle: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingBottom: 34,
   },
   homeMeta: {
@@ -1060,7 +1234,7 @@ const styles = StyleSheet.create({
   momentAction: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 26,
     marginTop: 32,
@@ -1069,7 +1243,7 @@ const styles = StyleSheet.create({
   nextTitle: {
     color: colors.foreground,
     fontSize: 34,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 39,
     marginTop: 28,
@@ -1078,7 +1252,7 @@ const styles = StyleSheet.create({
   nextStart: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 26,
     marginTop: 52,
@@ -1097,14 +1271,14 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   todayThreeRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
   },
   todayThreeTitle: {
     color: colors.foreground,
     flex: 1,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 26,
     opacity: opacity.title,
@@ -1126,30 +1300,30 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   progressHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   progressTrack: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: "rgba(255,255,255,0.10)",
     height: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: "rgba(255,255,255,0.72)",
     height: 2,
   },
   calendarSurface: {
-    alignSelf: 'center',
+    alignSelf: "center",
     flex: 1,
     gap: 18,
-    justifyContent: 'center',
-    width: '100%',
+    justifyContent: "center",
+    width: "100%",
   },
   weekdays: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignSelf: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     width: 308,
   },
   weekdayLabel: {
@@ -1159,22 +1333,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 18,
     opacity: opacity.metadata,
-    textAlign: 'center',
+    textAlign: "center",
     width: 32,
   },
   monthGrid: {
-    alignSelf: 'center',
+    alignSelf: "center",
     gap: 14,
     width: 308,
   },
   weekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   calendarCell: {
-    alignItems: 'center',
+    alignItems: "center",
     height: 32,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 32,
   },
   calendarLabel: {
@@ -1189,12 +1363,12 @@ const styles = StyleSheet.create({
     opacity: opacity.disabled,
   },
   monthActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: 10,
   },
   metrics: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 28,
   },
   metric: {
@@ -1204,25 +1378,25 @@ const styles = StyleSheet.create({
   metricValue: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 25,
     opacity: opacity.title,
   },
   dayHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   liveHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   titleText: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 26,
     opacity: opacity.title,
@@ -1273,13 +1447,13 @@ const styles = StyleSheet.create({
     paddingTop: 64,
   },
   dayRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
   },
   dayCopy: {
-    alignItems: 'baseline',
+    alignItems: "baseline",
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   dayTitle: {
@@ -1303,7 +1477,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 19,
     opacity: opacity.metadata,
-    textAlign: 'right',
+    textAlign: "right",
     width: 52,
   },
   recapSetValue: {
@@ -1313,7 +1487,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 19,
     opacity: opacity.metadata,
-    textAlign: 'right',
+    textAlign: "right",
     width: 92,
   },
   nudgeLine: {
@@ -1322,7 +1496,7 @@ const styles = StyleSheet.create({
   },
   workoutOverview: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingBottom: 72,
   },
   workoutExerciseList: {
@@ -1330,8 +1504,8 @@ const styles = StyleSheet.create({
     marginTop: 44,
   },
   workoutExerciseRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
+    alignItems: "flex-start",
+    flexDirection: "row",
   },
   workoutExerciseCopy: {
     flex: 1,
@@ -1346,13 +1520,13 @@ const styles = StyleSheet.create({
   },
   exerciseSurface: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingBottom: 120,
   },
   exerciseTitle: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 26,
     opacity: opacity.title,
@@ -1362,8 +1536,8 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   setRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
   },
   setValue: {
     color: colors.foreground,
@@ -1381,27 +1555,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 19,
     opacity: opacity.metadata,
-    textAlign: 'right',
+    textAlign: "right",
     width: 52,
   },
   restSurface: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingBottom: 84,
   },
   restTimer: {
     color: colors.foreground,
     fontFamily: typography.mono,
     fontSize: typeScale.countdown,
-    fontWeight: '300',
+    fontWeight: "300",
     letterSpacing: 0,
     lineHeight: 68,
     marginTop: 22,
     opacity: opacity.title,
   },
   restTicks: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginTop: 28,
   },
@@ -1418,19 +1592,19 @@ const styles = StyleSheet.create({
     width: 28,
   },
   nextBlock: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 6,
     marginTop: 56,
   },
   voiceSurface: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingBottom: 80,
   },
   listeningRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: 12,
     marginBottom: 54,
   },
@@ -1444,28 +1618,28 @@ const styles = StyleSheet.create({
   voiceText: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 29,
     marginBottom: 44,
     opacity: opacity.title,
-    textAlign: 'center',
+    textAlign: "center",
   },
   voiceInput: {
     color: colors.foreground,
     fontSize: typeScale.title,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 29,
     marginBottom: 44,
     minHeight: 96,
     opacity: opacity.title,
-    textAlign: 'center',
-    width: '100%',
+    textAlign: "center",
+    width: "100%",
   },
   planSurface: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingBottom: 72,
   },
   actionText: {
@@ -1474,8 +1648,8 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   bottomActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
 });

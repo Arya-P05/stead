@@ -1,13 +1,13 @@
 import {
   queryStatisticsForQuantity,
   requestAuthorization,
-} from '@kingstinct/react-native-healthkit';
-import type { HealthKitAdapter } from './healthkit';
+} from "@kingstinct/react-native-healthkit";
+import type { HealthKitAdapter } from "./healthkit";
 
 export const healthKitAdapter: HealthKitAdapter = {
   async requestStepAuthorization() {
     return requestAuthorization({
-      toRead: ['HKQuantityTypeIdentifierStepCount'],
+      toRead: ["HKQuantityTypeIdentifierStepCount"],
     });
   },
   async readTodaySteps() {
@@ -17,8 +17,8 @@ export const healthKitAdapter: HealthKitAdapter = {
     start.setHours(0, 0, 0, 0);
 
     const response = await queryStatisticsForQuantity(
-      'HKQuantityTypeIdentifierStepCount',
-      ['cumulativeSum'],
+      "HKQuantityTypeIdentifierStepCount",
+      ["cumulativeSum"],
       {
         filter: {
           date: {
@@ -26,7 +26,7 @@ export const healthKitAdapter: HealthKitAdapter = {
             endDate: now,
           },
         },
-        unit: 'count',
+        unit: "count",
       },
     );
 

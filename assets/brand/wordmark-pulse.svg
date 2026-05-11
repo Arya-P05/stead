@@ -1,8 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" width="520" height="140">
-  <title>stead — wordmark with pulse</title>
-  <text x="40" y="100" font-family="-apple-system, BlinkMacSystemFont, &#39;SF Pro Display&#39;, &#39;SF Pro Text&#39;, system-ui, sans-serif" font-size="100" font-weight="500" letter-spacing="-2.5" fill="#ffffff" fill-opacity="0.92">stead</text>
-  <circle cx="290" cy="92" r="9" fill="#9fe6b4">
-    
-    
-  </circle>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="140" viewBox="0 0 520 140"><title>stead — wordmark with pulse</title><text x="40" y="100" fill="#fff" fill-opacity=".92" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif" font-size="100" font-weight="500" letter-spacing="-2.5">stead</text><circle cx="290" cy="92" r="9" fill="#9fe6b4"/></svg>

@@ -1,22 +1,26 @@
-import { createDefaultWorkoutPlan, normalizeWorkoutPlan, updateExercise } from './workoutPlan';
+import {
+  createDefaultWorkoutPlan,
+  normalizeWorkoutPlan,
+  updateExercise,
+} from "./workoutPlan";
 
-describe('workout plan', () => {
-  it('creates the default push day plan', () => {
+describe("workout plan", () => {
+  it("creates the default push day plan", () => {
     const plan = createDefaultWorkoutPlan();
 
-    expect(plan.name).toBe('push day');
+    expect(plan.name).toBe("push day");
     expect(plan.exercises).toHaveLength(5);
     expect(plan.exercises[0]).toMatchObject({
-      id: 'incline-db-press',
+      id: "incline-db-press",
       targetSets: 4,
       targetReps: 10,
       weightLb: 50,
     });
   });
 
-  it('updates one exercise without touching the others', () => {
+  it("updates one exercise without touching the others", () => {
     const plan = createDefaultWorkoutPlan();
-    const updated = updateExercise(plan, 'incline-db-press', {
+    const updated = updateExercise(plan, "incline-db-press", {
       targetReps: 12,
       weightLb: 55,
     });
@@ -28,9 +32,9 @@ describe('workout plan', () => {
     expect(updated.exercises[1]).toEqual(plan.exercises[1]);
   });
 
-  it('keeps exercise values usable', () => {
+  it("keeps exercise values usable", () => {
     const plan = createDefaultWorkoutPlan();
-    const updated = updateExercise(plan, 'incline-db-press', {
+    const updated = updateExercise(plan, "incline-db-press", {
       targetSets: 0,
       targetReps: 0,
       restSeconds: -30,
@@ -45,14 +49,14 @@ describe('workout plan', () => {
     });
   });
 
-  it('repairs incomplete stored plans', () => {
+  it("repairs incomplete stored plans", () => {
     const normalized = normalizeWorkoutPlan({
-      id: 'push-day',
-      name: '',
+      id: "push-day",
+      name: "",
       exercises: [
         {
-          id: 'incline-db-press',
-          name: '',
+          id: "incline-db-press",
+          name: "",
           targetSets: 0,
           restSeconds: 0,
         },
