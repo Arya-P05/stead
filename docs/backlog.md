@@ -2,14 +2,14 @@
 
 Assignable work items for **stead**. Each ticket has a stable **ID** (`STEAD-###`), **priority**, **acceptance criteria**, and **dependencies** so it can be picked up without re-auditing the codebase.
 
-### How to use
+## How to use
 
 - Track status in your tool of choice (Linear, GitHub Projects, Jira): create one issue per `STEAD-###` and paste the **Acceptance criteria** block verbatim.
 - In PRs, reference the ID in the title or description (e.g. `STEAD-003: surface HealthKit errors`).
 - **Priority**: P0 = correctness / trust / data risk; P1 = core product honesty vs `docs/plan.md`; P2 = polish / tech debt that affects maintainability or App Store readiness; P3 = roadmap features.
 - **Estimate**: S ≤ 0.5 day, M ≤ 2 days, L ≤ 1 week (rough).
 
-### Related docs
+## Related docs
 
 - Product intent: `docs/plan.md`
 - UX constraints: `docs/design-system.md`
@@ -50,25 +50,25 @@ Assignable work items for **stead**. Each ticket has a stable **ID** (`STEAD-###
 
 ### STEAD-001 — Dynamic “today” and midnight rollover
 
-#### Problem
+#### Problem (STEAD-001)
 
 `today` in `App.tsx` is a module-level constant; date labels and `today.date` used for persistence do not advance if the app stays open across midnight or resumes the next day without reload.
 
-#### Scope
+#### Scope (STEAD-001)
 
 `App.tsx` (and any code assuming frozen `today`).
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-001)
 
 - [ ] “Today” date key used for `addDailyOutcome`, comparisons to `selectedDate`, and header copy is derived from **current** calendar date, not bundle load time.
 - [ ] Documented behavior: either **timer-based midnight refresh** or **refresh on `AppState` foreground** (or both); no silent wrong-date writes after midnight.
 - [ ] Manual QA steps written in PR: leave app backgrounded across local midnight (or simulate date change in dev), confirm new date on home and that new saves use the new `YYYY-MM-DD`.
 
-#### Dependencies
+#### Dependencies (STEAD-001)
 
 None.
 
-#### Estimate
+#### Estimate (STEAD-001)
 
 M
 
@@ -76,25 +76,25 @@ M
 
 ### STEAD-002 — Clarify `saveAppState` public API
 
-#### Problem
+#### Problem (STEAD-002)
 
 `saveAppState(undefined, appState)` relies on default-parameter behavior; easy to misuse and confusing in review.
 
-#### Scope
+#### Scope (STEAD-002)
 
 `src/data/storage.ts`, all call sites (currently `App.tsx`).
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-002)
 
 - [ ] Preferred API is either `saveAppState(state)` only, or **named** overload / object param so storage is never passed as positional `undefined`.
 - [ ] All call sites updated; `storage.test.ts` still passes.
 - [ ] No behavior change to persistence keys or JSON shape.
 
-#### Dependencies
+#### Dependencies (STEAD-002)
 
 None.
 
-#### Estimate
+#### Estimate (STEAD-002)
 
 S
 
@@ -102,25 +102,25 @@ S
 
 ### STEAD-003 — HealthKit step sync: visible outcomes
 
-#### Problem
+#### Problem (STEAD-003)
 
 `syncHealthSteps` swallows errors with `.catch(() => undefined)`; permission denial and failures are invisible.
 
-#### Scope
+#### Scope (STEAD-003)
 
 `App.tsx`, optionally `src/services/healthkit.ts` / `healthkitNative.ts` for error typing.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-003)
 
 - [ ] User sees **distinct** outcomes: success (steps updated), denied (short copy + link to Settings if appropriate), transient error (retry).
 - [ ] No unhandled promise rejections from the sync path.
 - [ ] Matches product rule: steps from HealthKit only (`docs/plan.md`).
 
-#### Dependencies
+#### Dependencies (STEAD-003)
 
 None (can ship before STEAD-010).
 
-#### Estimate
+#### Estimate (STEAD-003)
 
 S
 
@@ -128,24 +128,24 @@ S
 
 ### STEAD-004 — Step goal: single source of truth in UI
 
-#### Problem
+#### Problem (STEAD-004)
 
 `today.stepGoal` exists but the home steps label hardcodes `10,000`; progress uses `today.stepGoal` — inconsistency risk.
 
-#### Scope
+#### Scope (STEAD-004)
 
 `App.tsx` (steps block).
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-004)
 
 - [ ] Label denominator and progress bar both use the **same** goal value (constant or state field).
 - [ ] If goal becomes user-configurable later, only one field drives UI + `chooseRecommendation` input.
 
-#### Dependencies
+#### Dependencies (STEAD-004)
 
 Optional pairing with STEAD-010 if goal moves into app state.
 
-#### Estimate
+#### Estimate (STEAD-004)
 
 S
 
@@ -155,26 +155,26 @@ S
 
 ### STEAD-010 — Day context model (persisted or computed)
 
-#### Problem
+#### Problem (STEAD-010)
 
 Focus minutes, calendar lead time, weather, and “remaining items” are largely hardcoded; engine input does not match `docs/plan.md`.
 
-#### Scope
+#### Scope (STEAD-010)
 
 New module under `src/data` or `src/domain`, `AppState` / storage version bump (see STEAD-031), `App.tsx` consumers.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-010)
 
 - [ ] One typed structure (e.g. `DayContext` / `DayState`) holds fields currently faked in the module `today` object **that affect copy or recommendations**.
 - [ ] Values load from persistence with sane defaults for first-run.
 - [ ] `chooseRecommendation` and `chooseHomeMiddle` consume this structure, not literals in `App.tsx`.
 - [ ] Unit tests for merge/update rules (pure functions).
 
-#### Dependencies
+#### Dependencies (STEAD-010)
 
 STEAD-001 strongly recommended first.
 
-#### Estimate
+#### Estimate (STEAD-010)
 
 L
 
@@ -182,25 +182,25 @@ L
 
 ### STEAD-011 — Remove static `dayItems` and `remainingItems`
 
-#### Problem
+#### Problem (STEAD-011)
 
 Schedule rows are fixed demo arrays.
 
-#### Scope
+#### Scope (STEAD-011)
 
 `App.tsx`, day model from STEAD-010.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-011)
 
 - [ ] No `dayItems` / `remainingItems` constants driving production UI.
 - [ ] Home “today” list items come from day model (or explicit empty state).
 - [ ] If list is empty, UI shows calm empty copy (design-system tone), not fake rows.
 
-#### Dependencies
+#### Dependencies (STEAD-011)
 
 STEAD-010.
 
-#### Estimate
+#### Estimate (STEAD-011)
 
 M
 
@@ -208,25 +208,25 @@ M
 
 ### STEAD-012 — Home middle: honest meta strings
 
-#### Problem
+#### Problem (STEAD-012)
 
 `src/domain/homeMiddle.ts` embeds hardcoded duration / weather strings unrelated to actual plan or weather.
 
-#### Scope
+#### Scope (STEAD-012)
 
 `homeMiddle.ts`, inputs from plan + session + weather slice.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-012)
 
 - [ ] Workout “next” card shows **computed** duration/set/lift summary from `WorkoutPlan` + optional session progress, or omits numbers until computable.
 - [ ] “Walk / sun” style strings only appear when **weather + recommendation** justify them (or show neutral copy).
 - [ ] Unit tests updated: no assertions on magic strings unless they are intentional static fallbacks documented in code.
 
-#### Dependencies
+#### Dependencies (STEAD-012)
 
 STEAD-010, STEAD-040 (weather) optional for full fidelity.
 
-#### Estimate
+#### Estimate (STEAD-012)
 
 M
 
@@ -234,25 +234,25 @@ M
 
 ### STEAD-013 — Daily outcome: real completion counts
 
-#### Problem
+#### Problem (STEAD-013)
 
 `completeLooseItem` uses `?? 5`; `finishWorkout` hardcodes `6` / `7` completed vs planned.
 
-#### Scope
+#### Scope (STEAD-013)
 
 `App.tsx`, possibly `src/data/appState.ts` helpers.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-013)
 
 - [ ] `completedItems` / `plannedItems` reflect **defined** product rules (e.g. count of checkable items that day, or explicit user plan length).
 - [ ] No unexplained magic numbers; constants named or derived from model.
 - [ ] Tests for reducer-style updates if logic moves to `src/data`.
 
-#### Dependencies
+#### Dependencies (STEAD-013)
 
 STEAD-010 / STEAD-011 (needs defined list length).
 
-#### Estimate
+#### Estimate (STEAD-013)
 
 M
 
@@ -260,25 +260,25 @@ M
 
 ### STEAD-014 — Day surface: empty vs workout recap
 
-#### Problem
+#### Problem (STEAD-014)
 
 Without `selectedWorkoutOutcome`, UI shows `dayItems` demo and placeholder `5 / 7`.
 
-#### Scope
+#### Scope (STEAD-014)
 
 `DaySurface` in `App.tsx`.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-014)
 
 - [ ] If no workout outcome for that date: show **real** schedule from model OR a single honest empty state (no fake timeline).
 - [ ] Remove or replace placeholder `5 / 7` with copy tied to real data or remove the metric.
 - [ ] Tapping workout row still opens workout when applicable.
 
-#### Dependencies
+#### Dependencies (STEAD-014)
 
 STEAD-010, STEAD-011.
 
-#### Estimate
+#### Estimate (STEAD-014)
 
 M
 
@@ -286,24 +286,24 @@ M
 
 ### STEAD-015 — “plan tomorrow” control
 
-#### Problem
+#### Problem (STEAD-015)
 
 Button calls `() => undefined` — dead interaction.
 
-#### Scope
+#### Scope (STEAD-015)
 
 `DaySurface` in `App.tsx`.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-015)
 
 - [ ] Either: **implemented** minimal flow (e.g. opens edit tomorrow plan stub with save), **or** removed / hidden / disabled with explanation in UI spec.
 - [ ] No press handler that is a no-op.
 
-#### Dependencies
+#### Dependencies (STEAD-015)
 
 None (can hide before STEAD-010).
 
-#### Estimate
+#### Estimate (STEAD-015)
 
 S
 
@@ -311,25 +311,25 @@ S
 
 ### STEAD-016 — Workout completion gating for repeat sessions
 
-#### Problem
+#### Problem (STEAD-016)
 
 `hasCompletedWorkout(planId)` hides workout from “remaining” after any completion for that plan id forever.
 
-#### Scope
+#### Scope (STEAD-016)
 
 `src/data/appState.ts`, `App.tsx` where `openItems` is built.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-016)
 
 - [ ] Documented rule: e.g. “completed **today** for this plan”, or “session already logged today”, or explicit user “rest day” — pick one and implement.
 - [ ] After completing a workout, user can still see **correct** next action for subsequent days or same-day edge cases per product.
 - [ ] Unit tests for gating function(s).
 
-#### Dependencies
+#### Dependencies (STEAD-016)
 
 STEAD-001 (date correctness).
 
-#### Estimate
+#### Estimate (STEAD-016)
 
 M
 
@@ -337,25 +337,25 @@ M
 
 ### STEAD-017 — Calendar selection rules for past days
 
-#### Problem
+#### Problem (STEAD-017)
 
 `selectable: tracked && !future` prevents opening many past cells.
 
-#### Scope
+#### Scope (STEAD-017)
 
 `src/data/calendarDays.ts`, `CalendarSurface` UX copy.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-017)
 
 - [ ] Product rule documented in PR: e.g. “past days always viewable read-only” vs “only days with outcomes”.
 - [ ] Grid behavior matches rule; empty past days show honest empty day view (aligned with STEAD-014).
 - [ ] Future days remain non-selectable unless product explicitly allows planning.
 
-#### Dependencies
+#### Dependencies (STEAD-017)
 
 STEAD-014 for empty day UX.
 
-#### Estimate
+#### Estimate (STEAD-017)
 
 M
 
@@ -363,24 +363,24 @@ M
 
 ### STEAD-018 — `workout.planned` from data
 
-#### Problem
+#### Problem (STEAD-018)
 
 `chooseRecommendation` always receives `planned: true`.
 
-#### Scope
+#### Scope (STEAD-018)
 
 `App.tsx` + day model.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-018)
 
 - [ ] `workout.planned` reflects stored intent or inferred schedule from day model.
 - [ ] When not planned, workout branch of recommendation does not fire inappropriately.
 
-#### Dependencies
+#### Dependencies (STEAD-018)
 
 STEAD-010.
 
-#### Estimate
+#### Estimate (STEAD-018)
 
 S
 
@@ -390,25 +390,25 @@ S
 
 ### STEAD-020 — Voice capture: MVP decision and UX
 
-#### Problem
+#### Problem (STEAD-020)
 
 Workout “voice” is keyboard dictation; copy says so, but `docs/plan.md` describes voice-first capture.
 
-#### Scope
+#### Scope (STEAD-020)
 
 Workout voice UI in `App.tsx`, optional new `src/services/` adapter.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-020)
 
 - [ ] Written **decision** in PR: ship dictation MVP vs integrate OS speech APIs.
 - [ ] Onboarding line matches reality; parser errors already surfaced — verify copy on failure paths.
 - [ ] If staying on dictation: **accessibility** pass (labels, focus order).
 
-#### Dependencies
+#### Dependencies (STEAD-020)
 
 None.
 
-#### Estimate
+#### Estimate (STEAD-020)
 
 M
 
@@ -416,25 +416,25 @@ M
 
 ### STEAD-021 — Recommendation nudges via notifications
 
-#### Problem
+#### Problem (STEAD-021)
 
 `scheduleRecommendationNudge` is implemented and tested but **not** invoked from the app lifecycle.
 
-#### Scope
+#### Scope (STEAD-021)
 
 `App.tsx` or a small `src/services/recommendationNudges.ts`, align with `docs/plan.md` milestone 4.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-021)
 
 - [ ] At least one **concrete** user-visible path schedules a local notification (e.g. after enabling, or when recommendation type X appears).
 - [ ] Respects denied permissions (no crash; clear state).
 - [ ] Cancels or replaces scheduled nudges when recommendation changes, if applicable (document behavior).
 
-#### Dependencies
+#### Dependencies (STEAD-021)
 
 Product spec for _when_ to nudge (avoid nagging per plan principles).
 
-#### Estimate
+#### Estimate (STEAD-021)
 
 L
 
@@ -442,25 +442,25 @@ L
 
 ### STEAD-022 — Replace deprecated `SafeAreaView`
 
-#### Problem
+#### Problem (STEAD-022)
 
 `react-native` `SafeAreaView` is deprecated; Metro warns; plan is iOS-first safe areas.
 
-#### Scope
+#### Scope (STEAD-022)
 
 `App.tsx`, use `react-native-safe-area-context` (already a dependency).
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-022)
 
 - [ ] No `SafeAreaView` import from `react-native` for main chrome.
 - [ ] Home / calendar / day / workout surfaces respect notch + home indicator in dev build.
 - [ ] No new layout regressions on small devices (spot-check).
 
-#### Dependencies
+#### Dependencies (STEAD-022)
 
 None.
 
-#### Estimate
+#### Estimate (STEAD-022)
 
 S
 
@@ -468,25 +468,25 @@ S
 
 ### STEAD-023 — Workout modal: a11y + focus + gestures
 
-#### Problem
+#### Problem (STEAD-023)
 
 Large modal workout surface — risk of focus trap, scroll, and back gesture conflicts.
 
-#### Scope
+#### Scope (STEAD-023)
 
 `App.tsx` `Modal` + `WorkoutSurface`.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-023)
 
 - [ ] VoiceOver / TalkBack spot-check: focus order, button labels, modal announcement.
 - [ ] Android back / iOS swipe behavior documented and tested for close vs accidental dismiss.
 - [ ] No keyboard covering primary actions on small phones (if applicable).
 
-#### Dependencies
+#### Dependencies (STEAD-023)
 
 None.
 
-#### Estimate
+#### Estimate (STEAD-023)
 
 M
 
@@ -496,25 +496,25 @@ M
 
 ### STEAD-030 — Decompose `App.tsx`
 
-#### Problem
+#### Problem (STEAD-030)
 
 Single ~1.5k+ line file mixes state, surfaces, and styles — high regression cost.
 
-#### Scope
+#### Scope (STEAD-030)
 
 New folders under `src/` (e.g. `src/screens/`, `src/hooks/`, `src/styles/`).
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-030)
 
 - [ ] No behavior change; `npm test` + `npm run typecheck` green.
 - [ ] Each extracted screen has a clear props interface; shared hooks for hydration + persistence.
 - [ ] PR describes file map for reviewers.
 
-#### Dependencies
+#### Dependencies (STEAD-030)
 
 Best after P0/P1 batch to avoid merge pain.
 
-#### Estimate
+#### Estimate (STEAD-030)
 
 L
 
@@ -522,25 +522,25 @@ L
 
 ### STEAD-031 — App state schema versioning
 
-#### Problem
+#### Problem (STEAD-031)
 
 `AppState` is `version: 1`; adding day fields requires migration strategy.
 
-#### Scope
+#### Scope (STEAD-031)
 
 `src/data/appState.ts`, `src/data/storage.ts`.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-031)
 
 - [ ] Documented migration: bump version, migrate or reset with user-safe defaults.
 - [ ] Tests for load of v1 JSON into v2 shape (or explicit reset with log).
 - [ ] No silent data wipe without product sign-off (if wipe: show one-time notice — optional stretch).
 
-#### Dependencies
+#### Dependencies (STEAD-031)
 
 STEAD-010.
 
-#### Estimate
+#### Estimate (STEAD-031)
 
 M
 
@@ -548,20 +548,20 @@ M
 
 ### STEAD-032 — Integration-style tests for date + persistence
 
-#### Scope
+#### Scope (STEAD-032)
 
 Jest tests, possibly lightweight hook tests.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-032)
 
 - [ ] Test simulating date change or `AppState` active → verifies “today” key used in writes updates.
 - [ ] Test save → load round-trip for extended `AppState` (after STEAD-031 if applicable).
 
-#### Dependencies
+#### Dependencies (STEAD-032)
 
 STEAD-001, STEAD-002, STEAD-031 as applicable.
 
-#### Estimate
+#### Estimate (STEAD-032)
 
 M
 
@@ -569,20 +569,20 @@ M
 
 ### STEAD-040 — Weather for walk recommendation
 
-#### Scope
+#### Scope (STEAD-040)
 
 API client, caching, failure UI, `chooseRecommendation` inputs.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-040)
 
 - [ ] Weather unavailable → neutral recommendation path; no fake “sunny” claims.
 - [ ] Privacy: disclose location or city-level data in App Store privacy labels as required.
 
-#### Dependencies
+#### Dependencies (STEAD-040)
 
 STEAD-010.
 
-#### Estimate
+#### Estimate (STEAD-040)
 
 L
 
@@ -590,20 +590,20 @@ L
 
 ### STEAD-041 — Calendar integration for next-event lead time
 
-#### Scope
+#### Scope (STEAD-041)
 
 OS calendar read, permissions, `minutesUntilNextEvent` from real data.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-041)
 
 - [ ] Permission denied path does not break home; recommendation falls back per rules.
 - [ ] Tests use adapter mock (match `HealthKitAdapter` pattern).
 
-#### Dependencies
+#### Dependencies (STEAD-041)
 
 STEAD-010.
 
-#### Estimate
+#### Estimate (STEAD-041)
 
 L
 
@@ -611,19 +611,19 @@ L
 
 ### STEAD-042 — Supabase sync (deferred)
 
-#### Scope
+#### Scope (STEAD-042)
 
 Out of near-term scope per `docs/plan.md` milestone 8; ticket exists to avoid duplicate discovery.
 
-#### Acceptance criteria
+#### Acceptance criteria (STEAD-042)
 
 - [ ] Not started until auth + conflict model approved; link design doc when created.
 
-#### Dependencies
+#### Dependencies (STEAD-042)
 
 Full local model stable (STEAD-010+).
 
-#### Estimate
+#### Estimate (STEAD-042)
 
 L
 
