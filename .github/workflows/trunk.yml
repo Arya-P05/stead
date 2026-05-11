@@ -1,0 +1,30 @@
+name: Trunk
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: trunk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trunk-check:
+    name: Trunk Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Trunk Check
+        uses: trunk-io/trunk-action@v1
+        with:
+          check-mode: all
+        env:
+          TRUNK_TOKEN: ${{ secrets.TRUNK_TOKEN }}
