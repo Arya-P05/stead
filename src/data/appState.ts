@@ -2,7 +2,7 @@ import type { WorkoutSession } from "../domain/workoutSession";
 import type { WorkoutPlan } from "../domain/workoutSession";
 import { createDefaultWorkoutPlan } from "./workoutPlan";
 
-export const CURRENT_APP_STATE_VERSION = 3;
+export const CURRENT_APP_STATE_VERSION = 4;
 
 export type DailyOutcome = {
   date: string;
@@ -58,6 +58,12 @@ export type ExerciseWeight = {
   updatedAt: number;
 };
 
+export type ManagedWorkoutPlan = WorkoutPlan & {
+  createdAt: number;
+  updatedAt: number;
+  archivedAt: number | null;
+};
+
 export type StepSample = {
   capturedAt: number;
   steps: number;
@@ -71,12 +77,16 @@ export type AppState = {
   activeWorkoutSession: WorkoutSession | null;
   exerciseWeights: Record<string, ExerciseWeight>;
   stepSamples: StepSample[];
+  activeWorkoutPlanId: string;
   workoutPlan: WorkoutPlan;
+  workoutPlans: ManagedWorkoutPlan[];
   dailyPlans: DailyPlan[];
   dailyItems: DailyItem[];
 };
 
 export function createInitialAppState(): AppState {
+  const workoutPlan = createDefaultWorkoutPlan();
+
   return {
     version: CURRENT_APP_STATE_VERSION,
     dailyOutcomes: [],
@@ -84,7 +94,9 @@ export function createInitialAppState(): AppState {
     activeWorkoutSession: null,
     exerciseWeights: {},
     stepSamples: [],
-    workoutPlan: createDefaultWorkoutPlan(),
+    activeWorkoutPlanId: workoutPlan.id,
+    workoutPlan,
+    workoutPlans: [createManagedWorkoutPlan(workoutPlan, 0)],
     dailyPlans: [],
     dailyItems: [],
   };
@@ -153,9 +165,125 @@ export function saveWorkoutPlan(
   state: AppState,
   workoutPlan: WorkoutPlan,
 ): AppState {
+  const managedPlan = createManagedWorkoutPlan(
+    workoutPlan,
+    state.workoutPlans.find((plan) => plan.id === workoutPlan.id)?.createdAt ??
+      Date.now(),
+    Date.now(),
+    state.workoutPlans.find((plan) => plan.id === workoutPlan.id)?.archivedAt ??
+      null,
+  );
+
   return {
     ...state,
+    activeWorkoutPlanId: workoutPlan.id,
     workoutPlan,
+    workoutPlans: [
+      managedPlan,
+      ...state.workoutPlans.filter((plan) => plan.id !== workoutPlan.id),
+    ],
+  };
+}
+
+export function getActiveWorkoutPlan(state: AppState): WorkoutPlan {
+  return (
+    state.workoutPlans.find(
+      (plan) =>
+        plan.id === state.activeWorkoutPlanId && plan.archivedAt === null,
+    ) ??
+    state.workoutPlans.find((plan) => plan.archivedAt === null) ??
+    state.workoutPlan
+  );
+}
+
+export function addWorkoutPlan(
+  state: AppState,
+  plan: WorkoutPlan,
+  now = Date.now(),
+): AppState {
+  const managedPlan = createManagedWorkoutPlan(plan, now, now);
+
+  return {
+    ...state,
+    activeWorkoutPlanId: plan.id,
+    workoutPlan: plan,
+    workoutPlans: [
+      managedPlan,
+      ...state.workoutPlans.filter((stored) => stored.id !== plan.id),
+    ],
+  };
+}
+
+export function duplicateWorkoutPlan(
+  state: AppState,
+  planId: string,
+  now = Date.now(),
+): AppState {
+  const plan = state.workoutPlans.find((stored) => stored.id === planId);
+
+  if (!plan) {
+    return state;
+  }
+
+  return addWorkoutPlan(
+    state,
+    {
+      ...plan,
+      id: createLocalId("workout-plan"),
+      name: `${plan.name} copy`,
+      exercises: plan.exercises.map((exercise) => ({
+        ...exercise,
+        id: createLocalId("exercise"),
+      })),
+    },
+    now,
+  );
+}
+
+export function archiveWorkoutPlan(
+  state: AppState,
+  planId: string,
+  archivedAt = Date.now(),
+): AppState {
+  const workoutPlans = state.workoutPlans.map((plan) =>
+    plan.id === planId
+      ? {
+          ...plan,
+          archivedAt,
+          updatedAt: archivedAt,
+        }
+      : plan,
+  );
+  const activePlan =
+    workoutPlans.find(
+      (plan) =>
+        plan.id === state.activeWorkoutPlanId && plan.archivedAt === null,
+    ) ?? workoutPlans.find((plan) => plan.archivedAt === null);
+
+  return {
+    ...state,
+    activeWorkoutPlanId: activePlan?.id ?? state.activeWorkoutPlanId,
+    workoutPlan: activePlan ?? state.workoutPlan,
+    workoutPlans,
+  };
+}
+
+export function setActiveWorkoutPlan(
+  state: AppState,
+  planId: string,
+): AppState {
+  const plan = state.workoutPlans.find(
+    (stored) => stored.id === planId && stored.archivedAt === null,
+  );
+
+  if (!plan) {
+    return state;
+  }
+
+  return {
+    ...state,
+    activeWorkoutPlanId: plan.id,
+    workoutPlan: plan,
   };
 }
 
@@ -369,6 +497,20 @@ function resequenceDailyItems(items: DailyItem[], date: string) {
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createManagedWorkoutPlan(
+  plan: WorkoutPlan,
+  createdAt: number,
+  updatedAt = createdAt,
+  archivedAt: number | null = null,
+): ManagedWorkoutPlan {
+  return {
+    ...plan,
+    createdAt,
+    updatedAt,
+    archivedAt,
+  };
 }
 
 function formatDateKey(date: Date) {

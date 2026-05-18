@@ -3,16 +3,21 @@ import {
   addDailyItem,
   addStepSample,
   addWorkoutOutcome,
+  addWorkoutPlan,
+  archiveWorkoutPlan,
   clearActiveWorkoutSession,
   completeDailyItem,
   createInitialAppState,
   deleteDailyItem,
+  duplicateWorkoutPlan,
+  getActiveWorkoutPlan,
   getDailyItemsForDate,
   hasCompletedWorkout,
   hasCompletedWorkoutOnDate,
   reorderDailyItem,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
+  setActiveWorkoutPlan,
   updateDailyItem,
   upsertExerciseWeight,
 } from "./appState";
@@ -20,8 +25,10 @@ import { createDefaultWorkoutPlan } from "./workoutPlan";
 
 describe("app state", () => {
   it("starts with empty histories", () => {
+    const workoutPlan = createDefaultWorkoutPlan();
+
     expect(createInitialAppState()).toEqual({
-      version: 3,
+      version: 4,
       dailyOutcomes: [],
       dailyItems: [],
       dailyPlans: [],
@@ -29,7 +36,16 @@ describe("app state", () => {
       activeWorkoutSession: null,
       exerciseWeights: {},
       stepSamples: [],
-      workoutPlan: createDefaultWorkoutPlan(),
+      activeWorkoutPlanId: workoutPlan.id,
+      workoutPlan,
+      workoutPlans: [
+        {
+          ...workoutPlan,
+          createdAt: 0,
+          updatedAt: 0,
+          archivedAt: null,
+        },
+      ],
     });
   });
 
@@ -213,6 +229,35 @@ describe("app state", () => {
     expect(saveWorkoutPlan(createInitialAppState(), plan).workoutPlan).toEqual(
       plan,
     );
+  });
+
+  it("adds and selects multiple workout plans", () => {
+    const pullPlan = {
+      ...createDefaultWorkoutPlan(),
+      id: "pull-day",
+      name: "pull day",
+    };
+    const state = addWorkoutPlan(createInitialAppState(), pullPlan, 1000);
+    const selected = setActiveWorkoutPlan(state, "push-day");
+
+    expect(getActiveWorkoutPlan(state).name).toBe("pull day");
+    expect(getActiveWorkoutPlan(selected).name).toBe("push day");
+  });
+
+  it("duplicates and archives workout plans", () => {
+    const state = createInitialAppState();
+    const duplicated = duplicateWorkoutPlan(state, "push-day", 1000);
+    const copy = duplicated.workoutPlans.find((plan) =>
+      plan.name.endsWith("copy"),
+    );
+    const archived = archiveWorkoutPlan(duplicated, copy!.id, 2000);
+
+    expect(copy).toBeDefined();
+    expect(copy?.exercises[0].id).not.toBe("incline-db-press");
+    expect(
+      archived.workoutPlans.find((plan) => plan.id === copy?.id),
+    ).toMatchObject({ archivedAt: 2000 });
+    expect(getActiveWorkoutPlan(archived).id).toBe("push-day");
   });
 
   it("keeps the latest known weight per exercise", () => {

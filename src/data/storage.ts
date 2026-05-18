@@ -39,13 +39,38 @@ export function migrateAppState(stored: unknown): AppState {
   if (
     stored.version === 1 ||
     stored.version === 2 ||
+    stored.version === 3 ||
     stored.version === CURRENT_APP_STATE_VERSION
   ) {
+    const workoutPlan = normalizeWorkoutPlan(stored.workoutPlan);
+    const workoutPlans = Array.isArray(stored.workoutPlans)
+      ? stored.workoutPlans.map((plan) => ({
+          ...normalizeWorkoutPlan(plan),
+          createdAt: typeof plan.createdAt === "number" ? plan.createdAt : 0,
+          updatedAt: typeof plan.updatedAt === "number" ? plan.updatedAt : 0,
+          archivedAt:
+            typeof plan.archivedAt === "number" ? plan.archivedAt : null,
+        }))
+      : [
+          {
+            ...workoutPlan,
+            createdAt: 0,
+            updatedAt: 0,
+            archivedAt: null,
+          },
+        ];
+    const activeWorkoutPlanId =
+      typeof stored.activeWorkoutPlanId === "string"
+        ? stored.activeWorkoutPlanId
+        : workoutPlan.id;
+
     return {
       ...createInitialAppState(),
       ...stored,
       version: CURRENT_APP_STATE_VERSION,
-      workoutPlan: normalizeWorkoutPlan(stored.workoutPlan),
+      activeWorkoutPlanId,
+      workoutPlan,
+      workoutPlans,
     };
   }
 
