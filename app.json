@@ -28,7 +28,8 @@
           "NSHealthUpdateUsageDescription": "stead may write workout activity you choose to track."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-secure-store"
     ],
     "android": {
       "adaptiveIcon": {
