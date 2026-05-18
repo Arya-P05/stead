@@ -78,8 +78,11 @@ import { createCalendarMonth } from "./src/data/calendarDays";
 import type { CalendarMonth } from "./src/data/calendarDays";
 import { syncTodayStepsWithStatus } from "./src/services/healthkit";
 import {
+  addExercise,
   createDefaultWorkoutPlan,
+  moveExercise,
   normalizeWorkoutPlan,
+  removeExercise,
   updateExercise,
 } from "./src/data/workoutPlan";
 import {
@@ -635,6 +638,9 @@ function WorkoutSurface({
   onSelectPlan,
   onSelectExercise,
   onSkipRest,
+  onAddExercise,
+  onMoveExercise,
+  onRemoveExercise,
   onUpdateExercise,
 }: {
   activePlanId: string;
@@ -653,6 +659,9 @@ function WorkoutSurface({
   onSelectPlan: (planId: string) => void;
   onSelectExercise: (index: number) => void;
   onSkipRest: () => void;
+  onAddExercise: () => void;
+  onMoveExercise: (exerciseId: string, direction: -1 | 1) => void;
+  onRemoveExercise: (exerciseId: string) => void;
   onUpdateExercise: (
     exerciseId: string,
     patch: Parameters<typeof updateExercise>[2],
@@ -882,6 +891,65 @@ function WorkoutSurface({
                 <Text style={styles.supporting}>
                   selected · {selectedPlanExercise.name}
                 </Text>
+                <View style={styles.inlineActions}>
+                  <ActionText
+                    onPress={() =>
+                      onUpdateExercise(selectedPlanExercise.id, {
+                        targetSets: selectedPlanExercise.targetSets + 1,
+                      })
+                    }
+                  >
+                    sets +1
+                  </ActionText>
+                  <ActionText
+                    onPress={() =>
+                      onUpdateExercise(selectedPlanExercise.id, {
+                        targetReps: (selectedPlanExercise.targetReps ?? 10) + 1,
+                      })
+                    }
+                  >
+                    reps +1
+                  </ActionText>
+                  <ActionText
+                    onPress={() =>
+                      onUpdateExercise(selectedPlanExercise.id, {
+                        weightLb: (selectedPlanExercise.weightLb ?? 0) + 5,
+                      })
+                    }
+                  >
+                    lb +5
+                  </ActionText>
+                </View>
+                <View style={styles.inlineActions}>
+                  <ActionText
+                    onPress={() =>
+                      onUpdateExercise(selectedPlanExercise.id, {
+                        restSeconds: selectedPlanExercise.restSeconds + 15,
+                      })
+                    }
+                  >
+                    rest +15
+                  </ActionText>
+                  <ActionText
+                    disabled={planExerciseIndex === 0}
+                    onPress={() => onMoveExercise(selectedPlanExercise.id, -1)}
+                  >
+                    up
+                  </ActionText>
+                  <ActionText
+                    disabled={planExerciseIndex >= plan.exercises.length - 1}
+                    onPress={() => onMoveExercise(selectedPlanExercise.id, 1)}
+                  >
+                    down
+                  </ActionText>
+                  <ActionText
+                    disabled={plan.exercises.length <= 1}
+                    tone="warning"
+                    onPress={() => onRemoveExercise(selectedPlanExercise.id)}
+                  >
+                    remove
+                  </ActionText>
+                </View>
               </View>
             ) : stageView.isResting ? (
               <View style={styles.restSurface}>
@@ -972,24 +1040,7 @@ function WorkoutSurface({
                 <ActionText onPress={() => setMode("plans")}>
                   workouts
                 </ActionText>
-                <ActionText
-                  onPress={() =>
-                    onUpdateExercise(selectedPlanExercise.id, {
-                      targetReps: (selectedPlanExercise.targetReps ?? 10) + 1,
-                    })
-                  }
-                >
-                  reps +1
-                </ActionText>
-                <ActionText
-                  onPress={() =>
-                    onUpdateExercise(selectedPlanExercise.id, {
-                      weightLb: (selectedPlanExercise.weightLb ?? 0) + 5,
-                    })
-                  }
-                >
-                  lb +5
-                </ActionText>
+                <ActionText onPress={onAddExercise}>add</ActionText>
               </>
             ) : mode === "plans" ? (
               <>
@@ -1299,6 +1350,40 @@ function Home() {
       ),
     );
   };
+  const addWorkoutExercise = () => {
+    const createdAt = Date.now();
+
+    setAppState((state) =>
+      saveWorkoutPlan(
+        state,
+        addExercise(getActiveWorkoutPlan(state), {
+          id: `exercise-${createdAt}`,
+          name: "new exercise",
+          targetSets: 3,
+          targetReps: 10,
+          weightLb: 0,
+          restSeconds: 60,
+        }),
+      ),
+    );
+  };
+  const moveWorkoutExercise = (exerciseId: string, direction: -1 | 1) => {
+    setAppState((state) =>
+      saveWorkoutPlan(
+        state,
+        moveExercise(getActiveWorkoutPlan(state), exerciseId, direction),
+      ),
+    );
+  };
+  const removeWorkoutExercise = (exerciseId: string) => {
+    setAppState((state) => {
+      const nextPlan = removeExercise(getActiveWorkoutPlan(state), exerciseId);
+
+      setWorkoutSession(startWorkoutSession(nextPlan, Date.now()));
+
+      return saveWorkoutPlan(state, nextPlan);
+    });
+  };
   const createWorkoutPlan = () => {
     const createdAt = Date.now();
     const plan: WorkoutPlan = {
@@ -1526,6 +1611,9 @@ function Home() {
             return nextSession;
           })
         }
+        onAddExercise={addWorkoutExercise}
+        onMoveExercise={moveWorkoutExercise}
+        onRemoveExercise={removeWorkoutExercise}
         onUpdateExercise={editWorkoutExercise}
       />
     </SafeAreaView>
@@ -1745,6 +1833,13 @@ const styles = StyleSheet.create({
   metrics: {
     flexDirection: "row",
     gap: 28,
+  },
+  inlineActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 18,
+    marginTop: 18,
   },
   metric: {
     flex: 1,
