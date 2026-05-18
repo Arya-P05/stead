@@ -133,6 +133,64 @@ export function updateExercise(
   };
 }
 
+export function addExercise(
+  plan: WorkoutPlan,
+  exercise: WorkoutExercise,
+): WorkoutPlan {
+  return {
+    ...plan,
+    exercises: [...plan.exercises, normalizeExercise(exercise)],
+  };
+}
+
+export function removeExercise(
+  plan: WorkoutPlan,
+  exerciseId: string,
+): WorkoutPlan {
+  if (plan.exercises.length <= 1) {
+    return plan;
+  }
+
+  return {
+    ...plan,
+    exercises: plan.exercises.filter((exercise) => exercise.id !== exerciseId),
+  };
+}
+
+export function moveExercise(
+  plan: WorkoutPlan,
+  exerciseId: string,
+  direction: -1 | 1,
+): WorkoutPlan {
+  const index = plan.exercises.findIndex(
+    (exercise) => exercise.id === exerciseId,
+  );
+  const nextIndex = index + direction;
+
+  if (index < 0 || nextIndex < 0 || nextIndex >= plan.exercises.length) {
+    return plan;
+  }
+
+  const exercises = [...plan.exercises];
+  const [moved] = exercises.splice(index, 1);
+  exercises.splice(nextIndex, 0, moved);
+
+  return {
+    ...plan,
+    exercises,
+  };
+}
+
+function normalizeExercise(exercise: WorkoutExercise): WorkoutExercise {
+  return {
+    ...exercise,
+    targetSets: clampInt(exercise.targetSets, 1),
+    targetReps: clampInt(exercise.targetReps ?? 1, 1),
+    restSeconds: clampInt(exercise.restSeconds, 15),
+    weightLb: clampInt(exercise.weightLb ?? 0, 0),
+  };
+}
+
 function clampInt(value: number, min: number) {
   return Math.max(min, Math.round(value));
 }
