@@ -1,6 +1,7 @@
 import type { Recommendation } from "./recommendations";
 
 export type RemainingItem = {
+  id: string;
   title: string;
   action?: "workout";
 };

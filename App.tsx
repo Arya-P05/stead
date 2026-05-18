@@ -47,17 +47,22 @@ import {
 } from "./src/domain/workoutSession";
 import type { WorkoutPlan, WorkoutSession } from "./src/domain/workoutSession";
 import {
+  addDailyItem,
   addDailyOutcome,
   addWorkoutOutcome,
   addStepSample,
   clearActiveWorkoutSession,
+  completeDailyItem,
   createInitialAppState,
+  deleteDailyItem,
+  getDailyItemsForDate,
   hasCompletedWorkoutOnDate,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
+  updateDailyItem,
   upsertExerciseWeight,
 } from "./src/data/appState";
-import type { AppState } from "./src/data/appState";
+import type { AppState, DailyItem } from "./src/data/appState";
 import { loadAppState, saveAppState } from "./src/data/storage";
 import { createWorkoutOutcome } from "./src/data/workoutOutcome";
 import { createCalendarMonth } from "./src/data/calendarDays";
@@ -122,7 +127,7 @@ function formatWorkoutPlanMeta(plan: WorkoutPlan) {
 type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan";
-type Surface = "home" | "calendar" | "day";
+type Surface = "home" | "calendar" | "day" | "plan";
 
 function parseWorkoutVisualKey(key: string): {
   mode: WorkoutMode;
@@ -212,6 +217,7 @@ function IndexText({
 function DaySurface({
   loggedSets,
   onBack,
+  onPlan,
   onWorkout,
   selectedDate,
   selectedOutcome,
@@ -220,6 +226,7 @@ function DaySurface({
 }: {
   loggedSets: number;
   onBack: () => void;
+  onPlan: () => void;
   onWorkout: () => void;
   selectedDate: string;
   selectedOutcome?: AppState["dailyOutcomes"][number];
@@ -303,6 +310,7 @@ function DaySurface({
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
+        <ActionText onPress={onPlan}>plan</ActionText>
       </View>
     </View>
   );
@@ -382,6 +390,145 @@ function CalendarSurface({
   );
 }
 
+function DayPlanSurface({
+  date,
+  items,
+  onAddItem,
+  onBack,
+  onCompleteItem,
+  onDeleteItem,
+  onRenameItem,
+  workoutPlan,
+}: {
+  date: string;
+  items: DailyItem[];
+  onAddItem: (title: string) => void;
+  onBack: () => void;
+  onCompleteItem: (itemId: string) => void;
+  onDeleteItem: (itemId: string) => void;
+  onRenameItem: (itemId: string, title: string) => void;
+  workoutPlan: WorkoutPlan;
+}) {
+  const [draft, setDraft] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const selectedItem = items.find((item) => item.id === selectedItemId);
+
+  useEffect(() => {
+    setSelectedItemId(null);
+    setDraft("");
+  }, [date]);
+
+  const submitDraft = () => {
+    const title = draft.trim();
+
+    if (!title) {
+      return;
+    }
+
+    if (selectedItem) {
+      onRenameItem(selectedItem.id, title);
+    } else {
+      onAddItem(title);
+    }
+
+    setSelectedItemId(null);
+    setDraft("");
+  };
+
+  return (
+    <View style={styles.calendarContent}>
+      <View style={styles.dayHeader}>
+        <View style={styles.titleStack}>
+          <Text style={styles.titleText}>plan day</Text>
+          <Text style={styles.metadataText}>{date}</Text>
+        </View>
+      </View>
+
+      <View style={styles.dayList}>
+        {items.length === 0 ? (
+          <View style={styles.nudgeLine}>
+            <Text style={styles.homeMeta}>nothing planned</Text>
+            <Text style={styles.bodyText}>add the next thing.</Text>
+          </View>
+        ) : (
+          items.map((item, index) => (
+            <PressableScale
+              key={item.id}
+              onPress={() => {
+                setSelectedItemId(item.id);
+                setDraft(item.title);
+              }}
+              style={styles.dayRow}
+            >
+              <IndexText active={selectedItemId === item.id}>
+                {String(index + 1).padStart(2, "0")}
+              </IndexText>
+              <View style={styles.dayCopy}>
+                <Text
+                  style={[
+                    styles.dayTitle,
+                    styles.activeText,
+                    item.completedAt !== null && styles.untrackedText,
+                  ]}
+                >
+                  {item.title}
+                </Text>
+                {item.kind === "workout" ? (
+                  <Text style={styles.dayDetail}>{workoutPlan.name}</Text>
+                ) : null}
+              </View>
+              <Text
+                style={[
+                  styles.setNow,
+                  item.completedAt !== null && styles.successText,
+                ]}
+              >
+                {item.completedAt === null ? "edit" : "done"}
+              </Text>
+            </PressableScale>
+          ))
+        )}
+      </View>
+
+      <TextInput
+        onChangeText={setDraft}
+        placeholder={selectedItem ? "rename item" : "add item"}
+        placeholderTextColor="rgba(255,255,255,0.22)"
+        returnKeyType="done"
+        style={styles.planInput}
+        value={draft}
+      />
+
+      <View style={styles.bottomActions}>
+        <ActionText onPress={onBack}>back</ActionText>
+        {selectedItem ? (
+          <>
+            <ActionText
+              disabled={selectedItem.completedAt !== null}
+              onPress={() => onCompleteItem(selectedItem.id)}
+            >
+              done
+            </ActionText>
+            <ActionText
+              tone="warning"
+              onPress={() => {
+                onDeleteItem(selectedItem.id);
+                setSelectedItemId(null);
+                setDraft("");
+              }}
+            >
+              delete
+            </ActionText>
+          </>
+        ) : null}
+        <ActionText disabled={!draft.trim()} onPress={submitDraft}>
+          {selectedItem ? "save" : "add"}
+        </ActionText>
+      </View>
+    </View>
+  );
+}
+
 function addMonths(date: string, offset: number) {
   const parsed = new Date(`${date}T00:00:00.000Z`);
 
@@ -396,7 +543,7 @@ function HomeMiddleSurface({
   onWorkout,
 }: {
   middle: HomeMiddle;
-  onCompleteItem: (title: string) => void;
+  onCompleteItem: (itemId: string) => void;
   onWorkout: () => void;
 }) {
   if (middle.type === "moment") {
@@ -433,9 +580,7 @@ function HomeMiddleSurface({
           <PressableScale
             key={`${item.title}-${index}`}
             onPress={() =>
-              item.action === "workout"
-                ? onWorkout()
-                : onCompleteItem(item.title)
+              item.action === "workout" ? onWorkout() : onCompleteItem(item.id)
             }
             style={styles.todayThreeRow}
           >
@@ -862,6 +1007,15 @@ function Home() {
   const selectedWorkoutOutcome = appState.workoutOutcomes.find(
     (outcome) => formatTimestampDate(outcome.completedAt) === selectedDate,
   );
+  const todayItems = getDailyItemsForDate(appState, today.date);
+  const selectedDateItems = getDailyItemsForDate(appState, selectedDate);
+  const openItems = todayItems
+    .filter((item) => item.completedAt === null)
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      action: item.kind === "workout" ? ("workout" as const) : undefined,
+    }));
   const recommendation = chooseRecommendation({
     steps: latestSteps,
     stepGoal: today.stepGoal,
@@ -874,14 +1028,6 @@ function Home() {
       name: workoutPlan.name,
     },
   });
-  const plannedItems = [
-    { title: "walk" },
-    { title: workoutPlan.name, action: "workout" as const },
-    { title: "read" },
-  ];
-  const openItems = workoutComplete
-    ? plannedItems.filter((item) => item.title !== workoutPlan.name)
-    : plannedItems;
   const homeMiddle = chooseHomeMiddle({
     minutesWorked: today.focusMinutes,
     recommendation,
@@ -996,35 +1142,53 @@ function Home() {
   const closeWorkout = () => {
     setWorkoutVisible(false);
   };
-  const completeLooseItem = (title: string) => {
-    const plannedCount = Math.max(openItems.length, 1);
+  const completeLooseItem = (itemId: string) => {
+    const item = todayItems.find((dailyItem) => dailyItem.id === itemId);
+    const plannedCount = Math.max(todayItems.length, 1);
 
-    setAppState((state) =>
-      addDailyOutcome(state, {
+    if (!item) {
+      return;
+    }
+
+    setAppState((state) => {
+      const completedState = completeDailyItem(state, itemId);
+      const completedItems = getDailyItemsForDate(
+        completedState,
+        today.date,
+      ).filter((dailyItem) => dailyItem.completedAt !== null).length;
+
+      return addDailyOutcome(completedState, {
         date: today.date,
-        completedItems: Math.min(
-          (selectedOutcome?.completedItems ?? 0) + 1,
-          plannedCount,
-        ),
+        completedItems,
         plannedItems: plannedCount,
         steps: latestSteps,
         focusMinutes: today.focusMinutes,
-        note: `${title} done`,
-      }),
-    );
+        note: `${item.title} done`,
+      });
+    });
   };
   const finishWorkout = () => {
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
-    const plannedCount = Math.max(openItems.length, 1);
+    const linkedWorkoutItem = todayItems.find(
+      (item) =>
+        item.kind === "workout" &&
+        item.workoutPlanId === workoutPlan.id &&
+        item.completedAt === null,
+    );
+    const plannedCount = Math.max(todayItems.length, 1);
 
     setAppState((state) => {
-      const withWorkout = addWorkoutOutcome(state, outcome);
+      const withItemComplete = linkedWorkoutItem
+        ? completeDailyItem(state, linkedWorkoutItem.id, outcome.completedAt)
+        : state;
+      const withWorkout = addWorkoutOutcome(withItemComplete, outcome);
+      const completedItems = getDailyItemsForDate(
+        withWorkout,
+        today.date,
+      ).filter((item) => item.completedAt !== null).length;
       const withDailyOutcome = addDailyOutcome(withWorkout, {
         date: today.date,
-        completedItems: Math.min(
-          (selectedOutcome?.completedItems ?? 0) + 1,
-          plannedCount,
-        ),
+        completedItems,
         plannedItems: plannedCount,
         steps: latestSteps,
         focusMinutes: today.focusMinutes,
@@ -1062,6 +1226,35 @@ function Home() {
       ),
     );
   };
+  const addPlanItem = (title: string) => {
+    setAppState((state) =>
+      addDailyItem(state, {
+        date: selectedDate,
+        title,
+        kind: title.toLowerCase() === workoutPlan.name ? "workout" : "task",
+        workoutPlanId:
+          title.toLowerCase() === workoutPlan.name ? workoutPlan.id : undefined,
+      }),
+    );
+  };
+  const renamePlanItem = (itemId: string, title: string) => {
+    setAppState((state) =>
+      updateDailyItem(state, itemId, {
+        title,
+        kind: title.toLowerCase() === workoutPlan.name ? "workout" : "task",
+        workoutPlanId:
+          title.toLowerCase() === workoutPlan.name ? workoutPlan.id : undefined,
+      }),
+    );
+  };
+  const completePlanItem = (itemId: string) => {
+    if (selectedDate === today.date) {
+      completeLooseItem(itemId);
+      return;
+    }
+
+    setAppState((state) => completeDailyItem(state, itemId));
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -1070,15 +1263,27 @@ function Home() {
         {surfaceShown === "home" ? (
           <View style={styles.homeContent}>
             <View style={styles.homeHeader}>
-              <Text style={styles.titleText}>stead</Text>
-              <PressableScale
-                onPress={() => setSurfaceState("calendar")}
-                hitSlop={10}
-              >
-                <Text style={styles.metadataText}>
-                  {today.dateLabel} · {today.dateMeta}
-                </Text>
-              </PressableScale>
+              <View style={styles.homeHeaderRow}>
+                <View style={styles.titleStack}>
+                  <Text style={styles.titleText}>stead</Text>
+                  <PressableScale
+                    onPress={() => setSurfaceState("calendar")}
+                    hitSlop={10}
+                  >
+                    <Text style={styles.metadataText}>
+                      {today.dateLabel} · {today.dateMeta}
+                    </Text>
+                  </PressableScale>
+                </View>
+                <ActionText
+                  onPress={() => {
+                    setSelectedDate(today.date);
+                    setSurfaceState("plan");
+                  }}
+                >
+                  plan
+                </ActionText>
+              </View>
             </View>
 
             <HomeMiddleSurface
@@ -1133,10 +1338,24 @@ function Home() {
               setSurfaceState("day");
             }}
           />
+        ) : surfaceShown === "plan" ? (
+          <DayPlanSurface
+            date={selectedDate}
+            items={selectedDateItems}
+            onAddItem={addPlanItem}
+            onBack={() => setSurfaceState("home")}
+            onCompleteItem={completePlanItem}
+            onDeleteItem={(itemId) =>
+              setAppState((state) => deleteDailyItem(state, itemId))
+            }
+            onRenameItem={renamePlanItem}
+            workoutPlan={workoutPlan}
+          />
         ) : (
           <DaySurface
             loggedSets={loggedSets}
             onBack={() => setSurfaceState("home")}
+            onPlan={() => setSurfaceState("plan")}
             onWorkout={() => setWorkoutVisible(true)}
             selectedDate={selectedDate}
             selectedOutcome={selectedOutcome}
@@ -1228,6 +1447,11 @@ const styles = StyleSheet.create({
   },
   homeHeader: {
     gap: 6,
+  },
+  homeHeaderRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   titleStack: {
     gap: 6,
@@ -1661,6 +1885,17 @@ const styles = StyleSheet.create({
     minHeight: 96,
     opacity: opacity.title,
     textAlign: "center",
+    width: "100%",
+  },
+  planInput: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 29,
+    marginTop: "auto",
+    opacity: opacity.title,
+    paddingBottom: 28,
     width: "100%",
   },
   planSurface: {

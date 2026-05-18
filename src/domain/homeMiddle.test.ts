@@ -33,18 +33,18 @@ describe("chooseHomeMiddle", () => {
           type: "steady",
         },
         remainingItems: [
-          { title: "walk" },
-          { title: "push day", action: "workout" },
-          { title: "read" },
+          { id: "walk", title: "walk" },
+          { id: "push", title: "push day", action: "workout" },
+          { id: "read", title: "read" },
         ],
       }),
     ).toEqual({
       type: "today",
       meta: "three left today",
       items: [
-        { title: "walk" },
-        { title: "push day", action: "workout" },
-        { title: "read" },
+        { id: "walk", title: "walk" },
+        { id: "push", title: "push day", action: "workout" },
+        { id: "read", title: "read" },
       ],
     });
   });
@@ -58,7 +58,7 @@ describe("chooseHomeMiddle", () => {
           reason: "planned session still open",
           type: "workout",
         },
-        remainingItems: [{ title: "push day", action: "workout" }],
+        remainingItems: [{ id: "push", title: "push day", action: "workout" }],
         workoutMeta: "5 lifts · 16 sets",
       }),
     ).toEqual({
