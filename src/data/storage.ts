@@ -36,7 +36,11 @@ export function migrateAppState(stored: unknown): AppState {
     return createInitialAppState();
   }
 
-  if (stored.version === 1 || stored.version === CURRENT_APP_STATE_VERSION) {
+  if (
+    stored.version === 1 ||
+    stored.version === 2 ||
+    stored.version === CURRENT_APP_STATE_VERSION
+  ) {
     return {
       ...createInitialAppState(),
       ...stored,

@@ -2,7 +2,7 @@ import type { WorkoutSession } from "../domain/workoutSession";
 import type { WorkoutPlan } from "../domain/workoutSession";
 import { createDefaultWorkoutPlan } from "./workoutPlan";
 
-export const CURRENT_APP_STATE_VERSION = 2;
+export const CURRENT_APP_STATE_VERSION = 3;
 
 export type DailyOutcome = {
   date: string;
@@ -11,6 +11,27 @@ export type DailyOutcome = {
   steps: number;
   focusMinutes: number;
   note?: string;
+};
+
+export type DailyItemKind = "task" | "workout";
+
+export type DailyItem = {
+  id: string;
+  date: string;
+  title: string;
+  kind: DailyItemKind;
+  workoutPlanId?: string;
+  position: number;
+  completedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type DailyPlan = {
+  date: string;
+  itemIds: string[];
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type WorkoutExerciseOutcome = {
@@ -51,6 +72,8 @@ export type AppState = {
   exerciseWeights: Record<string, ExerciseWeight>;
   stepSamples: StepSample[];
   workoutPlan: WorkoutPlan;
+  dailyPlans: DailyPlan[];
+  dailyItems: DailyItem[];
 };
 
 export function createInitialAppState(): AppState {
@@ -62,6 +85,8 @@ export function createInitialAppState(): AppState {
     exerciseWeights: {},
     stepSamples: [],
     workoutPlan: createDefaultWorkoutPlan(),
+    dailyPlans: [],
+    dailyItems: [],
   };
 }
 
@@ -163,6 +188,187 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
       ),
     ].sort((a, b) => b.capturedAt - a.capturedAt),
   };
+}
+
+export function getDailyItemsForDate(state: AppState, date: string) {
+  return state.dailyItems
+    .filter((item) => item.date === date)
+    .sort((a, b) => a.position - b.position);
+}
+
+export function addDailyItem(
+  state: AppState,
+  item: Omit<
+    DailyItem,
+    "id" | "position" | "completedAt" | "createdAt" | "updatedAt"
+  > & {
+    id?: string;
+    position?: number;
+    completedAt?: number | null;
+    createdAt?: number;
+    updatedAt?: number;
+  },
+): AppState {
+  const now = item.updatedAt ?? item.createdAt ?? Date.now();
+  const existingItems = getDailyItemsForDate(state, item.date);
+  const nextItem: DailyItem = {
+    id: item.id ?? createLocalId("day-item"),
+    date: item.date,
+    title: item.title.trim(),
+    kind: item.kind,
+    workoutPlanId: item.workoutPlanId,
+    position: item.position ?? existingItems.length,
+    completedAt: item.completedAt ?? null,
+    createdAt: item.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  return upsertDailyPlan(
+    {
+      ...state,
+      dailyItems: [
+        nextItem,
+        ...state.dailyItems.filter((stored) => stored.id !== nextItem.id),
+      ].sort((a, b) => b.date.localeCompare(a.date) || a.position - b.position),
+    },
+    nextItem.date,
+  );
+}
+
+export function updateDailyItem(
+  state: AppState,
+  itemId: string,
+  patch: Partial<Pick<DailyItem, "title" | "kind" | "workoutPlanId">>,
+  updatedAt = Date.now(),
+): AppState {
+  return {
+    ...state,
+    dailyItems: state.dailyItems.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            ...patch,
+            title: patch.title?.trim() ?? item.title,
+            updatedAt,
+          }
+        : item,
+    ),
+  };
+}
+
+export function completeDailyItem(
+  state: AppState,
+  itemId: string,
+  completedAt = Date.now(),
+): AppState {
+  return {
+    ...state,
+    dailyItems: state.dailyItems.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            completedAt,
+            updatedAt: completedAt,
+          }
+        : item,
+    ),
+  };
+}
+
+export function deleteDailyItem(state: AppState, itemId: string): AppState {
+  const item = state.dailyItems.find((dailyItem) => dailyItem.id === itemId);
+  const nextItems = state.dailyItems.filter(
+    (dailyItem) => dailyItem.id !== itemId,
+  );
+
+  if (!item) {
+    return state;
+  }
+
+  return upsertDailyPlan(
+    {
+      ...state,
+      dailyItems: resequenceDailyItems(nextItems, item.date),
+    },
+    item.date,
+  );
+}
+
+export function reorderDailyItem(
+  state: AppState,
+  itemId: string,
+  direction: -1 | 1,
+): AppState {
+  const item = state.dailyItems.find((dailyItem) => dailyItem.id === itemId);
+
+  if (!item) {
+    return state;
+  }
+
+  const items = getDailyItemsForDate(state, item.date);
+  const index = items.findIndex((dailyItem) => dailyItem.id === itemId);
+  const nextIndex = index + direction;
+
+  if (index < 0 || nextIndex < 0 || nextIndex >= items.length) {
+    return state;
+  }
+
+  const reordered = [...items];
+  const [moved] = reordered.splice(index, 1);
+  reordered.splice(nextIndex, 0, moved);
+
+  return upsertDailyPlan(
+    {
+      ...state,
+      dailyItems: [
+        ...state.dailyItems.filter((dailyItem) => dailyItem.date !== item.date),
+        ...reordered.map((dailyItem, position) => ({
+          ...dailyItem,
+          position,
+          updatedAt: Date.now(),
+        })),
+      ],
+    },
+    item.date,
+  );
+}
+
+function upsertDailyPlan(state: AppState, date: string): AppState {
+  const items = getDailyItemsForDate(state, date);
+  const existing = state.dailyPlans.find((plan) => plan.date === date);
+  const now = Date.now();
+  const plan: DailyPlan = {
+    date,
+    itemIds: items.map((item) => item.id),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  return {
+    ...state,
+    dailyPlans: [
+      plan,
+      ...state.dailyPlans.filter((dailyPlan) => dailyPlan.date !== date),
+    ].sort((a, b) => b.date.localeCompare(a.date)),
+  };
+}
+
+function resequenceDailyItems(items: DailyItem[], date: string) {
+  let position = 0;
+
+  return items.map((item) =>
+    item.date === date
+      ? {
+          ...item,
+          position: position++,
+          updatedAt: Date.now(),
+        }
+      : item,
+  );
+}
+
+function createLocalId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function formatDateKey(date: Date) {

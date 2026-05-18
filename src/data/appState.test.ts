@@ -1,13 +1,19 @@
 import {
   addDailyOutcome,
+  addDailyItem,
   addStepSample,
   addWorkoutOutcome,
   clearActiveWorkoutSession,
+  completeDailyItem,
   createInitialAppState,
+  deleteDailyItem,
+  getDailyItemsForDate,
   hasCompletedWorkout,
   hasCompletedWorkoutOnDate,
+  reorderDailyItem,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
+  updateDailyItem,
   upsertExerciseWeight,
 } from "./appState";
 import { createDefaultWorkoutPlan } from "./workoutPlan";
@@ -15,8 +21,10 @@ import { createDefaultWorkoutPlan } from "./workoutPlan";
 describe("app state", () => {
   it("starts with empty histories", () => {
     expect(createInitialAppState()).toEqual({
-      version: 2,
+      version: 3,
       dailyOutcomes: [],
+      dailyItems: [],
+      dailyPlans: [],
       workoutOutcomes: [],
       activeWorkoutSession: null,
       exerciseWeights: {},
@@ -53,6 +61,72 @@ describe("app state", () => {
         note: "walk done",
       },
     ]);
+  });
+
+  it("adds daily items and keeps a date plan in order", () => {
+    const first = addDailyItem(createInitialAppState(), {
+      id: "walk",
+      date: "2026-05-18",
+      title: "walk",
+      kind: "task",
+      createdAt: 1000,
+      updatedAt: 1000,
+    });
+    const second = addDailyItem(first, {
+      id: "push",
+      date: "2026-05-18",
+      title: "push day",
+      kind: "workout",
+      workoutPlanId: "push-day",
+      createdAt: 2000,
+      updatedAt: 2000,
+    });
+
+    expect(
+      getDailyItemsForDate(second, "2026-05-18").map((item) => item.id),
+    ).toEqual(["walk", "push"]);
+    expect(second.dailyPlans).toEqual([
+      {
+        date: "2026-05-18",
+        itemIds: ["walk", "push"],
+        createdAt: expect.any(Number),
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("updates, completes, reorders, and deletes daily items", () => {
+    const state = addDailyItem(
+      addDailyItem(createInitialAppState(), {
+        id: "walk",
+        date: "2026-05-18",
+        title: "walk",
+        kind: "task",
+      }),
+      {
+        id: "read",
+        date: "2026-05-18",
+        title: "read",
+        kind: "task",
+      },
+    );
+    const updated = updateDailyItem(state, "read", { title: "read 30" }, 1000);
+    const completed = completeDailyItem(updated, "read", 2000);
+    const reordered = reorderDailyItem(completed, "read", -1);
+    const deleted = deleteDailyItem(reordered, "walk");
+
+    expect(getDailyItemsForDate(completed, "2026-05-18")[1]).toMatchObject({
+      id: "read",
+      title: "read 30",
+      completedAt: 2000,
+    });
+    expect(
+      getDailyItemsForDate(reordered, "2026-05-18").map((item) => item.id),
+    ).toEqual(["read", "walk"]);
+    expect(
+      getDailyItemsForDate(deleted, "2026-05-18").map((item) => item.id),
+    ).toEqual(["read"]);
+    expect(deleted.dailyPlans[0].itemIds).toEqual(["read"]);
   });
 
   it("stores workout outcomes newest first", () => {
