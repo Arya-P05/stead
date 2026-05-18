@@ -50,19 +50,28 @@ import {
   addDailyItem,
   addDailyOutcome,
   addWorkoutOutcome,
+  addWorkoutPlan,
+  archiveWorkoutPlan,
   addStepSample,
   clearActiveWorkoutSession,
   completeDailyItem,
   createInitialAppState,
   deleteDailyItem,
+  duplicateWorkoutPlan,
+  getActiveWorkoutPlan,
   getDailyItemsForDate,
   hasCompletedWorkoutOnDate,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
+  setActiveWorkoutPlan,
   updateDailyItem,
   upsertExerciseWeight,
 } from "./src/data/appState";
-import type { AppState, DailyItem } from "./src/data/appState";
+import type {
+  AppState,
+  DailyItem,
+  ManagedWorkoutPlan,
+} from "./src/data/appState";
 import { loadAppState, saveAppState } from "./src/data/storage";
 import { createWorkoutOutcome } from "./src/data/workoutOutcome";
 import { createCalendarMonth } from "./src/data/calendarDays";
@@ -126,7 +135,7 @@ function formatWorkoutPlanMeta(plan: WorkoutPlan) {
 
 type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
-type WorkoutMode = "overview" | "exercise" | "voice" | "plan";
+type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
 type Surface = "home" | "calendar" | "day" | "plan";
 
 function parseWorkoutVisualKey(key: string): {
@@ -610,26 +619,38 @@ function FormatTimer({ seconds }: { seconds: number }) {
 }
 
 function WorkoutSurface({
+  activePlanId,
   plan,
+  plans,
   session,
   visible,
   onAddRest,
+  onArchivePlan,
   onBack,
+  onCreatePlan,
+  onDuplicatePlan,
   onFinishWorkout,
   onLogSet,
   onLogVoice,
+  onSelectPlan,
   onSelectExercise,
   onSkipRest,
   onUpdateExercise,
 }: {
+  activePlanId: string;
   plan: WorkoutPlan;
+  plans: ManagedWorkoutPlan[];
   session: WorkoutSession;
   visible: boolean;
   onAddRest: () => void;
+  onArchivePlan: (planId: string) => void;
   onBack: () => void;
+  onCreatePlan: () => void;
+  onDuplicatePlan: (planId: string) => void;
   onFinishWorkout: () => void;
   onLogSet: () => void;
   onLogVoice: (transcript: string) => boolean;
+  onSelectPlan: (planId: string) => void;
   onSelectExercise: (index: number) => void;
   onSkipRest: () => void;
   onUpdateExercise: (
@@ -657,6 +678,9 @@ function WorkoutSurface({
     : "done";
   const selectedPlanExercise =
     plan.exercises[planExerciseIndex] ?? plan.exercises[0];
+  const activePlans = plans.filter(
+    (storedPlan) => storedPlan.archivedAt === null,
+  );
   const parsedVoiceLog = parseWorkoutVoiceLog(voiceTranscript);
 
   useEffect(() => {
@@ -794,6 +818,37 @@ function WorkoutSurface({
                   uses keyboard dictation today
                 </Text>
               </View>
+            ) : stageView.mode === "plans" ? (
+              <View style={styles.planSurface}>
+                <Text style={styles.metadataText}>workouts</Text>
+                <View style={styles.workoutExerciseList}>
+                  {activePlans.map((storedPlan, index) => (
+                    <PressableScale
+                      key={storedPlan.id}
+                      onPress={() => onSelectPlan(storedPlan.id)}
+                      style={styles.workoutExerciseRow}
+                    >
+                      <IndexText active={storedPlan.id === activePlanId}>
+                        {String(index + 1).padStart(2, "0")}
+                      </IndexText>
+                      <View style={styles.workoutExerciseCopy}>
+                        <Text
+                          style={[
+                            styles.workoutExerciseName,
+                            storedPlan.id !== activePlanId &&
+                              styles.untrackedText,
+                          ]}
+                        >
+                          {storedPlan.name}
+                        </Text>
+                        <Text style={styles.monoMeta}>
+                          {formatWorkoutPlanMeta(storedPlan)}
+                        </Text>
+                      </View>
+                    </PressableScale>
+                  ))}
+                </View>
+              </View>
             ) : stageView.mode === "plan" && selectedPlanExercise ? (
               <View style={styles.planSurface}>
                 <Text style={styles.metadataText}>edit plan</Text>
@@ -914,6 +969,9 @@ function WorkoutSurface({
                 <ActionText onPress={() => setMode("overview")}>
                   back
                 </ActionText>
+                <ActionText onPress={() => setMode("plans")}>
+                  workouts
+                </ActionText>
                 <ActionText
                   onPress={() =>
                     onUpdateExercise(selectedPlanExercise.id, {
@@ -931,6 +989,21 @@ function WorkoutSurface({
                   }
                 >
                   lb +5
+                </ActionText>
+              </>
+            ) : mode === "plans" ? (
+              <>
+                <ActionText onPress={() => setMode("plan")}>back</ActionText>
+                <ActionText onPress={onCreatePlan}>new</ActionText>
+                <ActionText onPress={() => onDuplicatePlan(activePlanId)}>
+                  copy
+                </ActionText>
+                <ActionText
+                  disabled={activePlans.length <= 1}
+                  tone="warning"
+                  onPress={() => onArchivePlan(activePlanId)}
+                >
+                  archive
                 </ActionText>
               </>
             ) : isResting ? (
@@ -987,7 +1060,7 @@ function Home() {
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(createDefaultWorkoutPlan(), Date.now()),
   );
-  const workoutPlan = appState.workoutPlan ?? createDefaultWorkoutPlan();
+  const workoutPlan = getActiveWorkoutPlan(appState);
   const loggedSets = workoutSession.sets.length;
   const latestSteps = appState.stepSamples[0]?.steps ?? 0;
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
@@ -1226,6 +1299,57 @@ function Home() {
       ),
     );
   };
+  const createWorkoutPlan = () => {
+    const createdAt = Date.now();
+    const plan: WorkoutPlan = {
+      id: `workout-plan-${createdAt}`,
+      name: "new workout",
+      exercises: [
+        {
+          id: `exercise-${createdAt}`,
+          name: "new exercise",
+          targetSets: 3,
+          targetReps: 10,
+          weightLb: 0,
+          restSeconds: 60,
+        },
+      ],
+    };
+
+    setAppState((state) => addWorkoutPlan(state, plan, createdAt));
+    setWorkoutSession(startWorkoutSession(plan, createdAt));
+  };
+  const selectWorkoutPlan = (planId: string) => {
+    const plan = appState.workoutPlans.find(
+      (storedPlan) =>
+        storedPlan.id === planId && storedPlan.archivedAt === null,
+    );
+
+    if (!plan) {
+      return;
+    }
+
+    setAppState((state) => setActiveWorkoutPlan(state, planId));
+    setWorkoutSession(startWorkoutSession(plan, Date.now()));
+  };
+  const duplicateActiveWorkoutPlan = (planId: string) => {
+    setAppState((state) => {
+      const nextState = duplicateWorkoutPlan(state, planId);
+      setWorkoutSession(
+        startWorkoutSession(getActiveWorkoutPlan(nextState), Date.now()),
+      );
+      return nextState;
+    });
+  };
+  const archiveActiveWorkoutPlan = (planId: string) => {
+    setAppState((state) => {
+      const nextState = archiveWorkoutPlan(state, planId);
+      setWorkoutSession(
+        startWorkoutSession(getActiveWorkoutPlan(nextState), Date.now()),
+      );
+      return nextState;
+    });
+  };
   const addPlanItem = (title: string) => {
     setAppState((state) =>
       addDailyItem(state, {
@@ -1366,7 +1490,9 @@ function Home() {
       </Animated.View>
 
       <WorkoutSurface
+        activePlanId={appState.activeWorkoutPlanId}
         plan={workoutPlan}
+        plans={appState.workoutPlans}
         session={workoutSession}
         visible={workoutVisible}
         onAddRest={() =>
@@ -1381,9 +1507,13 @@ function Home() {
           })
         }
         onBack={closeWorkout}
+        onArchivePlan={archiveActiveWorkoutPlan}
+        onCreatePlan={createWorkoutPlan}
+        onDuplicatePlan={duplicateActiveWorkoutPlan}
         onFinishWorkout={finishWorkout}
         onLogSet={logWorkoutSet}
         onLogVoice={logWorkoutVoice}
+        onSelectPlan={selectWorkoutPlan}
         onSelectExercise={selectWorkoutExercise}
         onSkipRest={() =>
           setWorkoutSession((session) => {
