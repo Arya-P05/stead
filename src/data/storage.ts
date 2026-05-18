@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createInitialAppState } from "./appState";
+import { CURRENT_APP_STATE_VERSION, createInitialAppState } from "./appState";
 import type { AppState } from "./appState";
 import { normalizeWorkoutPlan } from "./workoutPlan";
 
@@ -11,6 +11,10 @@ export type StorageAdapter = {
 export const APP_STATE_KEY = "stead.app-state";
 export const appStorage: StorageAdapter = AsyncStorage;
 
+type StoredAppState = Partial<Omit<AppState, "version">> & {
+  version?: number;
+};
+
 export async function loadAppState(
   storage: StorageAdapter = appStorage,
 ): Promise<AppState> {
@@ -21,20 +25,27 @@ export async function loadAppState(
   }
 
   try {
-    const parsed = JSON.parse(stored);
-
-    if (parsed?.version !== 1) {
-      return createInitialAppState();
-    }
-
-    return {
-      ...createInitialAppState(),
-      ...parsed,
-      workoutPlan: normalizeWorkoutPlan(parsed.workoutPlan),
-    };
+    return migrateAppState(JSON.parse(stored));
   } catch {
     return createInitialAppState();
   }
+}
+
+export function migrateAppState(stored: unknown): AppState {
+  if (!isStoredAppState(stored)) {
+    return createInitialAppState();
+  }
+
+  if (stored.version === 1 || stored.version === CURRENT_APP_STATE_VERSION) {
+    return {
+      ...createInitialAppState(),
+      ...stored,
+      version: CURRENT_APP_STATE_VERSION,
+      workoutPlan: normalizeWorkoutPlan(stored.workoutPlan),
+    };
+  }
+
+  return createInitialAppState();
 }
 
 export async function saveAppState(
@@ -42,4 +53,8 @@ export async function saveAppState(
   storage: StorageAdapter = appStorage,
 ): Promise<void> {
   await storage.setItem(APP_STATE_KEY, JSON.stringify(state));
+}
+
+function isStoredAppState(value: unknown): value is StoredAppState {
+  return typeof value === "object" && value !== null;
 }

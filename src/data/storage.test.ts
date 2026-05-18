@@ -3,7 +3,7 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 );
 
 import { createInitialAppState } from "./appState";
-import { loadAppState, saveAppState } from "./storage";
+import { loadAppState, migrateAppState, saveAppState } from "./storage";
 import type { StorageAdapter } from "./storage";
 
 function createMemoryStorage(initial?: Record<string, string>): StorageAdapter {
@@ -44,7 +44,7 @@ describe("storage", () => {
     );
   });
 
-  it("hydrates older v1 saves with the current defaults", async () => {
+  it("migrates older v1 saves with the current defaults", async () => {
     const storage = createMemoryStorage({
       "stead.app-state": JSON.stringify({
         version: 1,
@@ -59,6 +59,31 @@ describe("storage", () => {
     await expect(loadAppState(storage)).resolves.toEqual(
       createInitialAppState(),
     );
+  });
+
+  it("keeps valid saved fields when migrating from v1", () => {
+    expect(
+      migrateAppState({
+        version: 1,
+        dailyOutcomes: [
+          {
+            date: "2026-05-18",
+            completedItems: 1,
+            plannedItems: 3,
+            steps: 6000,
+            focusMinutes: 90,
+          },
+        ],
+      }).dailyOutcomes,
+    ).toEqual([
+      {
+        date: "2026-05-18",
+        completedItems: 1,
+        plannedItems: 3,
+        steps: 6000,
+        focusMinutes: 90,
+      },
+    ]);
   });
 
   it("repairs a broken saved workout plan", async () => {

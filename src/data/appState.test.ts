@@ -15,7 +15,7 @@ import { createDefaultWorkoutPlan } from "./workoutPlan";
 describe("app state", () => {
   it("starts with empty histories", () => {
     expect(createInitialAppState()).toEqual({
-      version: 1,
+      version: 2,
       dailyOutcomes: [],
       workoutOutcomes: [],
       activeWorkoutSession: null,

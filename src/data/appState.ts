@@ -2,6 +2,8 @@ import type { WorkoutSession } from "../domain/workoutSession";
 import type { WorkoutPlan } from "../domain/workoutSession";
 import { createDefaultWorkoutPlan } from "./workoutPlan";
 
+export const CURRENT_APP_STATE_VERSION = 2;
+
 export type DailyOutcome = {
   date: string;
   completedItems: number;
@@ -42,7 +44,7 @@ export type StepSample = {
 };
 
 export type AppState = {
-  version: 1;
+  version: typeof CURRENT_APP_STATE_VERSION;
   dailyOutcomes: DailyOutcome[];
   workoutOutcomes: WorkoutOutcome[];
   activeWorkoutSession: WorkoutSession | null;
@@ -53,7 +55,7 @@ export type AppState = {
 
 export function createInitialAppState(): AppState {
   return {
-    version: 1,
+    version: CURRENT_APP_STATE_VERSION,
     dailyOutcomes: [],
     workoutOutcomes: [],
     activeWorkoutSession: null,
