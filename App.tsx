@@ -78,6 +78,14 @@ import { createCalendarMonth } from "./src/data/calendarDays";
 import type { CalendarMonth } from "./src/data/calendarDays";
 import { syncTodayStepsWithStatus } from "./src/services/healthkit";
 import {
+  getAuthState,
+  signInWithApple,
+  signOut,
+  type AuthState,
+} from "./src/services/auth";
+import { isSupabaseConfigured } from "./src/services/supabaseClient";
+import { scheduleRecommendationNudge } from "./src/services/notifications";
+import {
   addExercise,
   createDefaultWorkoutPlan,
   moveExercise,
@@ -139,7 +147,7 @@ function formatWorkoutPlanMeta(plan: WorkoutPlan) {
 type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
-type Surface = "home" | "calendar" | "day" | "plan";
+type Surface = "home" | "calendar" | "day" | "plan" | "settings";
 
 function parseWorkoutVisualKey(key: string): {
   mode: WorkoutMode;
@@ -536,6 +544,91 @@ function DayPlanSurface({
         <ActionText disabled={!draft.trim()} onPress={submitDraft}>
           {selectedItem ? "save" : "add"}
         </ActionText>
+      </View>
+    </View>
+  );
+}
+
+function SettingsSurface({
+  authMessage,
+  authState,
+  healthSyncStatus,
+  notificationsEnabled,
+  onBack,
+  onEnableNotifications,
+  onSignIn,
+  onSignOut,
+  supabaseConfigured,
+}: {
+  authMessage: string | null;
+  authState: AuthState;
+  healthSyncStatus: HealthSyncStatus;
+  notificationsEnabled: boolean;
+  onBack: () => void;
+  onEnableNotifications: () => void;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  supabaseConfigured: boolean;
+}) {
+  return (
+    <View style={styles.calendarContent}>
+      <View style={styles.dayHeader}>
+        <View style={styles.titleStack}>
+          <Text style={styles.titleText}>settings</Text>
+          <Text style={styles.metadataText}>account · sync · permissions</Text>
+        </View>
+      </View>
+
+      <View style={styles.dayList}>
+        <View style={styles.nudgeLine}>
+          <Text style={styles.homeMeta}>account</Text>
+          <Text style={styles.bodyText}>
+            {authState.status === "signedIn"
+              ? (authState.user.email ?? "signed in with apple")
+              : "not signed in"}
+          </Text>
+          {authMessage ? (
+            <Text style={styles.metadataText}>{authMessage}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.nudgeLine}>
+          <Text style={styles.homeMeta}>sync</Text>
+          <Text style={styles.bodyText}>
+            {supabaseConfigured ? "supabase ready" : "local mode"}
+          </Text>
+          <Text style={styles.metadataText}>
+            local saves continue even when sync is unavailable.
+          </Text>
+        </View>
+
+        <View style={styles.nudgeLine}>
+          <Text style={styles.homeMeta}>health</Text>
+          <Text style={styles.bodyText}>{healthSyncStatus}</Text>
+          <Text style={styles.metadataText}>
+            steps come from healthkit only.
+          </Text>
+        </View>
+
+        <View style={styles.nudgeLine}>
+          <Text style={styles.homeMeta}>notifications</Text>
+          <Text style={styles.bodyText}>
+            {notificationsEnabled ? "nudges on" : "nudges off"}
+          </Text>
+          <Text style={styles.metadataText}>local reminders only for v1.</Text>
+        </View>
+      </View>
+
+      <View style={styles.bottomActions}>
+        <ActionText onPress={onBack}>back</ActionText>
+        {authState.status === "signedIn" ? (
+          <ActionText tone="warning" onPress={onSignOut}>
+            sign out
+          </ActionText>
+        ) : (
+          <ActionText onPress={onSignIn}>apple</ActionText>
+        )}
+        <ActionText onPress={onEnableNotifications}>nudges</ActionText>
       </View>
     </View>
   );
@@ -1107,6 +1200,11 @@ function Home() {
   const [visibleMonthDate, setVisibleMonthDate] = useState(() => today.date);
   const [healthSyncStatus, setHealthSyncStatus] =
     useState<HealthSyncStatus>("idle");
+  const [authState, setAuthState] = useState<AuthState>({
+    status: "signedOut",
+  });
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(createDefaultWorkoutPlan(), Date.now()),
@@ -1162,6 +1260,12 @@ function Home() {
 
   useEffect(() => {
     let cancelled = false;
+
+    getAuthState().then((state) => {
+      if (!cancelled) {
+        setAuthState(state);
+      }
+    });
 
     loadAppState().then((stored) => {
       if (!cancelled) {
@@ -1227,6 +1331,44 @@ function Home() {
         }
       })
       .catch(() => setHealthSyncStatus("error"));
+  };
+  const signIn = () => {
+    setAuthMessage(null);
+
+    void signInWithApple()
+      .then((state) => {
+        setAuthState(state);
+        setAuthMessage(
+          state.status === "signedIn" ? "sync account ready" : null,
+        );
+      })
+      .catch((error) =>
+        setAuthMessage(
+          error instanceof Error ? error.message : "sign in failed",
+        ),
+      );
+  };
+  const signOutOfAccount = () => {
+    void signOut()
+      .then(() => {
+        setAuthState({ status: "signedOut" });
+        setAuthMessage("signed out");
+      })
+      .catch((error) =>
+        setAuthMessage(
+          error instanceof Error ? error.message : "sign out failed",
+        ),
+      );
+  };
+  const enableNotifications = () => {
+    void scheduleRecommendationNudge({
+      identifier: `stead-${today.date}`,
+      title: "stead",
+      body: recommendation.action,
+      secondsFromNow: 60 * 30,
+    }).then((id) => {
+      setNotificationsEnabled(id !== null);
+    });
   };
 
   const logWorkoutSet = () => {
@@ -1484,14 +1626,19 @@ function Home() {
                     </Text>
                   </PressableScale>
                 </View>
-                <ActionText
-                  onPress={() => {
-                    setSelectedDate(today.date);
-                    setSurfaceState("plan");
-                  }}
-                >
-                  plan
-                </ActionText>
+                <View style={styles.headerActions}>
+                  <ActionText
+                    onPress={() => {
+                      setSelectedDate(today.date);
+                      setSurfaceState("plan");
+                    }}
+                  >
+                    plan
+                  </ActionText>
+                  <ActionText onPress={() => setSurfaceState("settings")}>
+                    settings
+                  </ActionText>
+                </View>
               </View>
             </View>
 
@@ -1559,6 +1706,18 @@ function Home() {
             }
             onRenameItem={renamePlanItem}
             workoutPlan={workoutPlan}
+          />
+        ) : surfaceShown === "settings" ? (
+          <SettingsSurface
+            authMessage={authMessage}
+            authState={authState}
+            healthSyncStatus={healthSyncStatus}
+            notificationsEnabled={notificationsEnabled}
+            onBack={() => setSurfaceState("home")}
+            onEnableNotifications={enableNotifications}
+            onSignIn={signIn}
+            onSignOut={signOutOfAccount}
+            supabaseConfigured={isSupabaseConfigured()}
           />
         ) : (
           <DaySurface
@@ -1670,6 +1829,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  headerActions: {
+    alignItems: "flex-end",
+    gap: 10,
   },
   titleStack: {
     gap: 6,

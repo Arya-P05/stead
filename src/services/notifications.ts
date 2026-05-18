@@ -40,8 +40,8 @@ export type RecommendationNudge = {
 };
 
 export async function scheduleRecommendationNudge(
-  adapter: NotificationAdapter = Notifications as unknown as NotificationAdapter,
   nudge: RecommendationNudge,
+  adapter: NotificationAdapter = Notifications as unknown as NotificationAdapter,
 ) {
   const permissions = await adapter.getPermissionsAsync();
   if (permissions.status === "denied") {

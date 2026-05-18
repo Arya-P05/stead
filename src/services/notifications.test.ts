@@ -22,12 +22,15 @@ describe("scheduleRecommendationNudge", () => {
     const adapter = createAdapter("undetermined");
 
     await expect(
-      scheduleRecommendationNudge(adapter, {
-        identifier: "stead-next-action",
-        title: "you've been at it three hours.",
-        body: "walk · ten min · sun is out",
-        secondsFromNow: 60,
-      }),
+      scheduleRecommendationNudge(
+        {
+          identifier: "stead-next-action",
+          title: "you've been at it three hours.",
+          body: "walk · ten min · sun is out",
+          secondsFromNow: 60,
+        },
+        adapter,
+      ),
     ).resolves.toBe("notification-id");
     expect(adapter.requestPermissionsAsync).toHaveBeenCalled();
     expect(adapter.scheduleNotificationAsync).toHaveBeenCalledWith({
@@ -49,12 +52,15 @@ describe("scheduleRecommendationNudge", () => {
     const adapter = createAdapter("denied");
 
     await expect(
-      scheduleRecommendationNudge(adapter, {
-        identifier: "stead-next-action",
-        title: "walk",
-        body: "ten min",
-        secondsFromNow: 60,
-      }),
+      scheduleRecommendationNudge(
+        {
+          identifier: "stead-next-action",
+          title: "walk",
+          body: "ten min",
+          secondsFromNow: 60,
+        },
+        adapter,
+      ),
     ).resolves.toBeNull();
     expect(adapter.scheduleNotificationAsync).not.toHaveBeenCalled();
   });
