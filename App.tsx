@@ -84,6 +84,7 @@ import {
   type AuthState,
 } from "./src/services/auth";
 import { isSupabaseConfigured } from "./src/services/supabaseClient";
+import { syncAppState, type SyncStatus } from "./src/services/sync";
 import { scheduleRecommendationNudge } from "./src/services/notifications";
 import {
   addExercise,
@@ -558,7 +559,10 @@ function SettingsSurface({
   onEnableNotifications,
   onSignIn,
   onSignOut,
+  onSync,
   supabaseConfigured,
+  syncMessage,
+  syncStatus,
 }: {
   authMessage: string | null;
   authState: AuthState;
@@ -568,8 +572,24 @@ function SettingsSurface({
   onEnableNotifications: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
+  onSync: () => void;
   supabaseConfigured: boolean;
+  syncMessage: string | null;
+  syncStatus: SyncStatus;
 }) {
+  const syncCopy =
+    syncStatus === "syncing"
+      ? "syncing"
+      : syncStatus === "synced"
+        ? "synced"
+        : syncStatus === "signedOut"
+          ? "sign in to sync"
+          : syncStatus === "error"
+            ? "sync needs attention"
+            : supabaseConfigured
+              ? "supabase ready"
+              : "local mode";
+
   return (
     <View style={styles.calendarContent}>
       <View style={styles.dayHeader}>
@@ -594,11 +614,9 @@ function SettingsSurface({
 
         <View style={styles.nudgeLine}>
           <Text style={styles.homeMeta}>sync</Text>
-          <Text style={styles.bodyText}>
-            {supabaseConfigured ? "supabase ready" : "local mode"}
-          </Text>
+          <Text style={styles.bodyText}>{syncCopy}</Text>
           <Text style={styles.metadataText}>
-            local saves continue even when sync is unavailable.
+            {syncMessage ?? "local saves continue when sync is unavailable."}
           </Text>
         </View>
 
@@ -621,6 +639,16 @@ function SettingsSurface({
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
+        <ActionText
+          disabled={
+            !supabaseConfigured ||
+            syncStatus === "syncing" ||
+            authState.status !== "signedIn"
+          }
+          onPress={onSync}
+        >
+          sync
+        </ActionText>
         {authState.status === "signedIn" ? (
           <ActionText tone="warning" onPress={onSignOut}>
             sign out
@@ -1204,6 +1232,8 @@ function Home() {
     status: "signedOut",
   });
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutSession, setWorkoutSession] = useState(() =>
@@ -1334,6 +1364,7 @@ function Home() {
   };
   const signIn = () => {
     setAuthMessage(null);
+    setSyncMessage(null);
 
     void signInWithApple()
       .then((state) => {
@@ -1353,6 +1384,8 @@ function Home() {
       .then(() => {
         setAuthState({ status: "signedOut" });
         setAuthMessage("signed out");
+        setSyncStatus("signedOut");
+        setSyncMessage("local saves stay on this phone.");
       })
       .catch((error) =>
         setAuthMessage(
@@ -1368,6 +1401,28 @@ function Home() {
       secondsFromNow: 60 * 30,
     }).then((id) => {
       setNotificationsEnabled(id !== null);
+    });
+  };
+  const syncNow = () => {
+    setSyncStatus("syncing");
+    setSyncMessage("pushing local changes, then pulling remote updates.");
+
+    void syncAppState(appState).then((result) => {
+      if (result.status === "synced") {
+        setAppState(result.state);
+        setSyncStatus("synced");
+        setSyncMessage("synced just now");
+        return;
+      }
+
+      if (result.status === "signedOut") {
+        setSyncStatus("signedOut");
+        setSyncMessage("sign in with apple first.");
+        return;
+      }
+
+      setSyncStatus("error");
+      setSyncMessage(result.message);
     });
   };
 
@@ -1717,7 +1772,10 @@ function Home() {
             onEnableNotifications={enableNotifications}
             onSignIn={signIn}
             onSignOut={signOutOfAccount}
+            onSync={syncNow}
             supabaseConfigured={isSupabaseConfigured()}
+            syncMessage={syncMessage}
+            syncStatus={syncStatus}
           />
         ) : (
           <DaySurface
