@@ -7,11 +7,11 @@ import type { SteadDatabase } from "./syncTypes";
 
 export type SupabaseConfig = {
   url?: string;
-  anonKey?: string;
+  key?: string;
 };
 
 export function isSupabaseConfigured(config = readSupabaseConfig()) {
-  return Boolean(config.url && config.anonKey);
+  return Boolean(config.url && config.key);
 }
 
 export function createSteadSupabaseClient(
@@ -21,7 +21,7 @@ export function createSteadSupabaseClient(
     return null;
   }
 
-  return createClient<SteadDatabase>(config.url!, config.anonKey!, {
+  return createClient<SteadDatabase>(config.url!, config.key!, {
     auth: {
       storage: AsyncStorage,
       autoRefreshToken: true,
@@ -36,6 +36,6 @@ export const supabase = createSteadSupabaseClient();
 function readSupabaseConfig(): SupabaseConfig {
   return {
     url: process.env.EXPO_PUBLIC_SUPABASE_URL,
-    anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    key: process.env.EXPO_PUBLIC_SUPABASE_KEY,
   };
 }
