@@ -43,6 +43,15 @@ export type DailyPlanRow = Row<{
   date: string;
 }>;
 
+export type DailyOutcomeRow = Row<{
+  date: string;
+  completed_items: number;
+  planned_items: number;
+  steps: number;
+  focus_minutes: number;
+  note: string | null;
+}>;
+
 export type DailyItemRow = Row<{
   local_id: string;
   date: string;
@@ -91,6 +100,7 @@ export type SteadDatabase = {
       workout_exercises: Table<WorkoutExerciseRow>;
       workout_outcomes: Table<WorkoutOutcomeRow>;
       daily_plans: Table<DailyPlanRow>;
+      daily_outcomes: Table<DailyOutcomeRow>;
       daily_items: Table<DailyItemRow>;
       step_samples: Table<StepSampleRow>;
       notification_preferences: Table<NotificationPreferencesRow>;

@@ -73,6 +73,20 @@ create table if not exists public.daily_items (
   unique(user_id, local_id)
 );
 
+create table if not exists public.daily_outcomes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  date text not null,
+  completed_items integer not null,
+  planned_items integer not null,
+  steps integer not null,
+  focus_minutes integer not null,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, date)
+);
+
 create table if not exists public.step_samples (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -95,6 +109,7 @@ alter table public.workout_exercises enable row level security;
 alter table public.workout_outcomes enable row level security;
 alter table public.daily_plans enable row level security;
 alter table public.daily_items enable row level security;
+alter table public.daily_outcomes enable row level security;
 alter table public.step_samples enable row level security;
 alter table public.notification_preferences enable row level security;
 
@@ -114,6 +129,9 @@ create policy "daily plans owner access" on public.daily_plans
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "daily items owner access" on public.daily_items
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "daily outcomes owner access" on public.daily_outcomes
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "step samples owner access" on public.step_samples
