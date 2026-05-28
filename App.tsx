@@ -15,7 +15,9 @@ import Animated, {
   FadeIn,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -79,6 +81,7 @@ import {
   markOnboardingAccountConnected,
   markOnboardingHealthConnected,
   markOnboardingNotificationsEnabled,
+  markOnboardingWorkoutPlanSet,
   saveOnboardingState,
   type OnboardingState,
 } from "./src/data/onboarding";
@@ -103,6 +106,11 @@ import {
   removeExercise,
   updateExercise,
 } from "./src/data/workoutPlan";
+import {
+  createWorkoutPlanFromPreset,
+  getWorkoutPresets,
+  type WorkoutPresetId,
+} from "./src/data/workoutPresets";
 import {
   applyWorkoutVoiceLog,
   parseWorkoutVoiceLog,
@@ -158,7 +166,13 @@ type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
 type Surface = "home" | "calendar" | "day" | "plan" | "settings";
-type OnboardingStepId = "intro" | "account" | "steps" | "nudges" | "ready";
+type OnboardingStepId =
+  | "intro"
+  | "account"
+  | "workouts"
+  | "steps"
+  | "nudges"
+  | "ready";
 
 const onboardingSteps: Array<{
   id: OnboardingStepId;
@@ -179,20 +193,26 @@ const onboardingSteps: Array<{
     body: "sync plans, lifts, steps, and outcomes.",
   },
   {
-    id: "steps",
+    id: "workouts",
     index: "03",
+    title: "set the split",
+    body: "pick a starter, then edit every lift.",
+  },
+  {
+    id: "steps",
+    index: "04",
     title: "connect steps",
     body: "healthkit only. no manual step entry.",
   },
   {
     id: "nudges",
-    index: "04",
+    index: "05",
     title: "allow nudges",
     body: "short local reminders when the day drifts.",
   },
   {
     id: "ready",
-    index: "05",
+    index: "06",
     title: "lock in",
     body: "start with today, then keep the record honest.",
   },
@@ -715,45 +735,73 @@ function OnboardingSurface({
   healthSyncStatus,
   notificationsEnabled,
   onboardingState,
+  workoutPlan,
   onApple,
+  onCustomizeWorkout,
   onFinish,
   onHealth,
   onNotifications,
+  onPresetWorkout,
 }: {
   authState: AuthState;
   healthSyncStatus: HealthSyncStatus;
   notificationsEnabled: boolean;
   onboardingState: OnboardingState;
+  workoutPlan: WorkoutPlan;
   onApple: () => void;
+  onCustomizeWorkout: () => void;
   onFinish: () => void;
   onHealth: () => void;
   onNotifications: () => void;
+  onPresetWorkout: (presetId: WorkoutPresetId) => void;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
   const step = onboardingSteps[stepIndex];
   const progress = useSharedValue(0);
+  const breathe = useSharedValue(0);
   const stageStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: [{ translateY: (1 - progress.value) * 12 }],
+    transform: [
+      { translateY: (1 - progress.value) * 16 },
+      { scale: 0.985 + progress.value * 0.015 },
+    ],
   }));
   const progressStyle = useAnimatedStyle(() => ({
     width: `${((stepIndex + 1) / onboardingSteps.length) * 100}%`,
   }));
+  const signalStyle = useAnimatedStyle(() => ({
+    opacity: 0.28 + breathe.value * 0.34,
+    transform: [{ scaleX: 0.72 + breathe.value * 0.28 }],
+  }));
   const accountReady =
     authState.status === "signedIn" ||
     onboardingState.accountConnectedAt !== null;
+  const workoutReady = onboardingState.workoutPlanSetAt !== null;
   const healthReady =
     healthSyncStatus === "synced" || onboardingState.healthConnectedAt !== null;
   const nudgesReady =
     notificationsEnabled || onboardingState.notificationsEnabledAt !== null;
+  const presets = getWorkoutPresets();
 
   useEffect(() => {
     progress.value = 0;
-    progress.value = withTiming(1, {
-      duration: 420,
-      easing: Easing.out(Easing.cubic),
+    progress.value = withSpring(1, {
+      damping: 22,
+      stiffness: 180,
+      mass: 0.5,
     });
   }, [progress, step.id]);
+
+  useEffect(() => {
+    breathe.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.cubic) }),
+        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.cubic) }),
+      ),
+      -1,
+      false,
+    );
+  }, [breathe]);
 
   useEffect(() => {
     if (step.id === "account" && accountReady) {
@@ -762,20 +810,26 @@ function OnboardingSurface({
       return () => clearTimeout(timeout);
     }
 
-    if (step.id === "steps" && healthReady) {
-      const timeout = setTimeout(() => setStepIndex(3), 520);
+    if (step.id === "workouts" && workoutReady) {
+      const timeout = setTimeout(() => setStepIndex(3), 640);
 
       return () => clearTimeout(timeout);
     }
 
-    if (step.id === "nudges" && nudgesReady) {
+    if (step.id === "steps" && healthReady) {
       const timeout = setTimeout(() => setStepIndex(4), 520);
 
       return () => clearTimeout(timeout);
     }
 
+    if (step.id === "nudges" && nudgesReady) {
+      const timeout = setTimeout(() => setStepIndex(5), 520);
+
+      return () => clearTimeout(timeout);
+    }
+
     return undefined;
-  }, [accountReady, healthReady, nudgesReady, step.id]);
+  }, [accountReady, healthReady, nudgesReady, step.id, workoutReady]);
 
   const primaryLabel =
     step.id === "intro"
@@ -784,23 +838,29 @@ function OnboardingSurface({
         ? accountReady
           ? "connected"
           : "apple"
-        : step.id === "steps"
-          ? healthReady
-            ? "connected"
-            : healthSyncStatus === "syncing"
-              ? "connecting"
-              : "health"
-          : step.id === "nudges"
-            ? nudgesReady
-              ? "enabled"
-              : "nudges"
-            : "enter stead";
+        : step.id === "workouts"
+          ? workoutReady
+            ? "selected"
+            : "use push"
+          : step.id === "steps"
+            ? healthReady
+              ? "connected"
+              : healthSyncStatus === "syncing"
+                ? "connecting"
+                : "health"
+            : step.id === "nudges"
+              ? nudgesReady
+                ? "enabled"
+                : "nudges"
+              : "enter stead";
   const primaryDisabled =
     (step.id === "account" && accountReady) ||
+    (step.id === "workouts" && workoutReady) ||
     (step.id === "steps" && (healthReady || healthSyncStatus === "syncing")) ||
     (step.id === "nudges" && nudgesReady);
   const statusItems = [
     { label: "account", ready: accountReady },
+    { label: "workout", ready: workoutReady },
     { label: "steps", ready: healthReady },
     { label: "nudges", ready: nudgesReady },
   ];
@@ -813,6 +873,11 @@ function OnboardingSurface({
 
     if (step.id === "account") {
       onApple();
+      return;
+    }
+
+    if (step.id === "workouts") {
+      onPresetWorkout("push");
       return;
     }
 
@@ -846,6 +911,10 @@ function OnboardingSurface({
           <Text style={styles.onboardingBody}>{step.body}</Text>
         </Animated.View>
 
+        <View style={styles.onboardingSignal}>
+          <Animated.View style={[styles.onboardingSignalFill, signalStyle]} />
+        </View>
+
         <View style={styles.onboardingStatus}>
           {statusItems.map((item) => (
             <View key={item.label} style={styles.onboardingStatusRow}>
@@ -870,6 +939,35 @@ function OnboardingSurface({
             </View>
           ))}
         </View>
+
+        {step.id === "workouts" ? (
+          <View style={styles.onboardingPresetList}>
+            {presets.map((preset, index) => (
+              <PressableScale
+                key={preset.id}
+                onPress={() => onPresetWorkout(preset.id)}
+                style={styles.onboardingPresetRow}
+              >
+                <IndexText active={workoutPlan.name === preset.name}>
+                  {String(index + 1).padStart(2, "0")}
+                </IndexText>
+                <View style={styles.workoutExerciseCopy}>
+                  <Text
+                    style={[
+                      styles.workoutExerciseName,
+                      workoutPlan.name !== preset.name && styles.untrackedText,
+                    ]}
+                  >
+                    {preset.name}
+                  </Text>
+                  <Text style={styles.monoMeta}>
+                    {preset.exerciseCount} lifts · {preset.setCount} sets
+                  </Text>
+                </View>
+              </PressableScale>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.onboardingProgressTrack}>
@@ -891,8 +989,11 @@ function OnboardingSurface({
               )
             }
           >
-            later
+            skip
           </ActionText>
+        ) : null}
+        {step.id === "workouts" ? (
+          <ActionText onPress={onCustomizeWorkout}>customize</ActionText>
         ) : null}
         <ActionText disabled={primaryDisabled} onPress={onPrimary}>
           {primaryLabel}
@@ -984,6 +1085,7 @@ function FormatTimer({ seconds }: { seconds: number }) {
 
 function WorkoutSurface({
   activePlanId,
+  initialMode = "overview",
   plan,
   plans,
   session,
@@ -1005,6 +1107,7 @@ function WorkoutSurface({
   onUpdateExercise,
 }: {
   activePlanId: string;
+  initialMode?: WorkoutMode;
   plan: WorkoutPlan;
   plans: ManagedWorkoutPlan[];
   session: WorkoutSession;
@@ -1058,12 +1161,12 @@ function WorkoutSurface({
       return undefined;
     }
 
-    setMode("overview");
+    setMode(initialMode);
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
 
     return () => clearInterval(timer);
-  }, [visible]);
+  }, [initialMode, visible]);
 
   useEffect(() => {
     if (isResting) {
@@ -1485,6 +1588,8 @@ function Home() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [workoutVisible, setWorkoutVisible] = useState(false);
+  const [workoutInitialMode, setWorkoutInitialMode] =
+    useState<WorkoutMode>("overview");
   const [workoutSession, setWorkoutSession] = useState(() =>
     startWorkoutSession(createDefaultWorkoutPlan(), Date.now()),
   );
@@ -1736,6 +1841,10 @@ function Home() {
   const closeWorkout = () => {
     setWorkoutVisible(false);
   };
+  const openWorkout = (initialMode: WorkoutMode = "overview") => {
+    setWorkoutInitialMode(initialMode);
+    setWorkoutVisible(true);
+  };
   const completeLooseItem = (itemId: string) => {
     const item = todayItems.find((dailyItem) => dailyItem.id === itemId);
     const plannedCount = Math.max(todayItems.length, 1);
@@ -1874,6 +1983,14 @@ function Home() {
     setAppState((state) => addWorkoutPlan(state, plan, createdAt));
     setWorkoutSession(startWorkoutSession(plan, createdAt));
   };
+  const choosePresetWorkoutPlan = (presetId: WorkoutPresetId) => {
+    const createdAt = Date.now();
+    const plan = createWorkoutPlanFromPreset(presetId, createdAt);
+
+    setAppState((state) => addWorkoutPlan(state, plan, createdAt));
+    setWorkoutSession(startWorkoutSession(plan, createdAt));
+    setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
+  };
   const selectWorkoutPlan = (planId: string) => {
     const plan = appState.workoutPlans.find(
       (storedPlan) =>
@@ -1961,10 +2078,59 @@ function Home() {
           healthSyncStatus={healthSyncStatus}
           notificationsEnabled={notificationsEnabled}
           onboardingState={onboardingState}
+          workoutPlan={workoutPlan}
           onApple={signIn}
+          onCustomizeWorkout={() => {
+            setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
+            openWorkout("plan");
+          }}
           onFinish={finishOnboarding}
           onHealth={syncHealthSteps}
           onNotifications={enableNotifications}
+          onPresetWorkout={choosePresetWorkoutPlan}
+        />
+        <WorkoutSurface
+          activePlanId={appState.activeWorkoutPlanId}
+          initialMode={workoutInitialMode}
+          plan={workoutPlan}
+          plans={appState.workoutPlans}
+          session={workoutSession}
+          visible={workoutVisible}
+          onAddRest={() =>
+            setWorkoutSession((session) => {
+              const nextSession = addRestTime(session, 30);
+
+              setAppState((state) =>
+                saveActiveWorkoutSession(state, nextSession),
+              );
+
+              return nextSession;
+            })
+          }
+          onArchivePlan={archiveActiveWorkoutPlan}
+          onBack={closeWorkout}
+          onCreatePlan={createWorkoutPlan}
+          onDuplicatePlan={duplicateActiveWorkoutPlan}
+          onFinishWorkout={finishWorkout}
+          onLogSet={logWorkoutSet}
+          onLogVoice={logWorkoutVoice}
+          onSelectPlan={selectWorkoutPlan}
+          onSelectExercise={selectWorkoutExercise}
+          onSkipRest={() =>
+            setWorkoutSession((session) => {
+              const nextSession = skipRest(session);
+
+              setAppState((state) =>
+                saveActiveWorkoutSession(state, nextSession),
+              );
+
+              return nextSession;
+            })
+          }
+          onAddExercise={addWorkoutExercise}
+          onMoveExercise={moveWorkoutExercise}
+          onRemoveExercise={removeWorkoutExercise}
+          onUpdateExercise={editWorkoutExercise}
         />
       </SafeAreaView>
     );
@@ -1998,6 +2164,9 @@ function Home() {
                   >
                     plan
                   </ActionText>
+                  <ActionText onPress={() => openWorkout("plans")}>
+                    workouts
+                  </ActionText>
                   <ActionText onPress={() => setSurfaceState("settings")}>
                     settings
                   </ActionText>
@@ -2008,7 +2177,7 @@ function Home() {
             <HomeMiddleSurface
               middle={homeMiddle}
               onCompleteItem={completeLooseItem}
-              onWorkout={() => setWorkoutVisible(true)}
+              onWorkout={() => openWorkout("overview")}
             />
 
             <View style={styles.progressBlock}>
@@ -2090,7 +2259,7 @@ function Home() {
             loggedSets={loggedSets}
             onBack={() => setSurfaceState("home")}
             onPlan={() => setSurfaceState("plan")}
-            onWorkout={() => setWorkoutVisible(true)}
+            onWorkout={() => openWorkout("overview")}
             selectedDate={selectedDate}
             selectedOutcome={selectedOutcome}
             selectedWorkoutOutcome={selectedWorkoutOutcome}
@@ -2101,6 +2270,7 @@ function Home() {
 
       <WorkoutSurface
         activePlanId={appState.activeWorkoutPlanId}
+        initialMode={workoutInitialMode}
         plan={workoutPlan}
         plans={appState.workoutPlans}
         session={workoutSession}
@@ -2230,6 +2400,19 @@ const styles = StyleSheet.create({
     maxWidth: 292,
     opacity: opacity.body,
   },
+  onboardingSignal: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    height: 2,
+    marginTop: 34,
+    overflow: "hidden",
+    width: 148,
+  },
+  onboardingSignalFill: {
+    backgroundColor: colors.success,
+    height: 2,
+    transformOrigin: "left",
+    width: 148,
+  },
   onboardingStatus: {
     gap: 16,
     marginTop: 56,
@@ -2245,6 +2428,14 @@ const styles = StyleSheet.create({
   onboardingStatusReady: {
     color: colors.success,
     opacity: opacity.title,
+  },
+  onboardingPresetList: {
+    gap: 18,
+    marginTop: 36,
+  },
+  onboardingPresetRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
   },
   onboardingProgressTrack: {
     backgroundColor: "rgba(255,255,255,0.10)",
