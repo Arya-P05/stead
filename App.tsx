@@ -1104,6 +1104,7 @@ function WorkoutSurface({
   onAddExercise,
   onMoveExercise,
   onRemoveExercise,
+  onRenamePlan,
   onUpdateExercise,
 }: {
   activePlanId: string;
@@ -1126,6 +1127,7 @@ function WorkoutSurface({
   onAddExercise: () => void;
   onMoveExercise: (exerciseId: string, direction: -1 | 1) => void;
   onRemoveExercise: (exerciseId: string) => void;
+  onRenamePlan: (name: string) => void;
   onUpdateExercise: (
     exerciseId: string,
     patch: Parameters<typeof updateExercise>[2],
@@ -1325,6 +1327,13 @@ function WorkoutSurface({
             ) : stageView.mode === "plan" && selectedPlanExercise ? (
               <View style={styles.planSurface}>
                 <Text style={styles.metadataText}>edit plan</Text>
+                <TextInput
+                  onChangeText={onRenamePlan}
+                  placeholder="plan name"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  style={styles.planNameInput}
+                  value={plan.name}
+                />
                 <View style={styles.workoutExerciseList}>
                   {plan.exercises.map((exercise, index) => (
                     <PressableScale
@@ -1355,6 +1364,15 @@ function WorkoutSurface({
                 <Text style={styles.supporting}>
                   selected · {selectedPlanExercise.name}
                 </Text>
+                <TextInput
+                  onChangeText={(name) =>
+                    onUpdateExercise(selectedPlanExercise.id, { name })
+                  }
+                  placeholder="exercise name"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  style={styles.exerciseNameInput}
+                  value={selectedPlanExercise.name}
+                />
                 <View style={styles.inlineActions}>
                   <ActionText
                     onPress={() =>
@@ -1929,6 +1947,14 @@ function Home() {
       ),
     );
   };
+  const renameWorkoutPlan = (name: string) => {
+    setAppState((state) =>
+      saveWorkoutPlan(state, {
+        ...getActiveWorkoutPlan(state),
+        name: name.trimStart(),
+      }),
+    );
+  };
   const addWorkoutExercise = () => {
     const createdAt = Date.now();
 
@@ -2129,6 +2155,7 @@ function Home() {
           }
           onAddExercise={addWorkoutExercise}
           onMoveExercise={moveWorkoutExercise}
+          onRenamePlan={renameWorkoutPlan}
           onRemoveExercise={removeWorkoutExercise}
           onUpdateExercise={editWorkoutExercise}
         />
@@ -2308,6 +2335,7 @@ function Home() {
         }
         onAddExercise={addWorkoutExercise}
         onMoveExercise={moveWorkoutExercise}
+        onRenamePlan={renameWorkoutPlan}
         onRemoveExercise={removeWorkoutExercise}
         onUpdateExercise={editWorkoutExercise}
       />
@@ -2913,6 +2941,26 @@ const styles = StyleSheet.create({
     opacity: opacity.title,
     paddingBottom: 28,
     width: "100%",
+  },
+  planNameInput: {
+    color: colors.foreground,
+    fontSize: 28,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 34,
+    marginTop: 20,
+    opacity: opacity.title,
+    padding: 0,
+  },
+  exerciseNameInput: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 26,
+    marginTop: 18,
+    opacity: opacity.title,
+    padding: 0,
   },
   planSurface: {
     flex: 1,
