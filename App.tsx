@@ -73,6 +73,15 @@ import type {
   ManagedWorkoutPlan,
 } from "./src/data/appState";
 import { loadAppState, saveAppState } from "./src/data/storage";
+import {
+  completeOnboarding,
+  loadOnboardingState,
+  markOnboardingAccountConnected,
+  markOnboardingHealthConnected,
+  markOnboardingNotificationsEnabled,
+  saveOnboardingState,
+  type OnboardingState,
+} from "./src/data/onboarding";
 import { createWorkoutOutcome } from "./src/data/workoutOutcome";
 import { createCalendarMonth } from "./src/data/calendarDays";
 import type { CalendarMonth } from "./src/data/calendarDays";
@@ -149,6 +158,45 @@ type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
 type Surface = "home" | "calendar" | "day" | "plan" | "settings";
+type OnboardingStepId = "intro" | "account" | "steps" | "nudges" | "ready";
+
+const onboardingSteps: Array<{
+  id: OnboardingStepId;
+  index: string;
+  title: string;
+  body: string;
+}> = [
+  {
+    id: "intro",
+    index: "01",
+    title: "stead",
+    body: "a quiet system for the next four months.",
+  },
+  {
+    id: "account",
+    index: "02",
+    title: "save the work",
+    body: "sync plans, lifts, steps, and outcomes.",
+  },
+  {
+    id: "steps",
+    index: "03",
+    title: "connect steps",
+    body: "healthkit only. no manual step entry.",
+  },
+  {
+    id: "nudges",
+    index: "04",
+    title: "allow nudges",
+    body: "short local reminders when the day drifts.",
+  },
+  {
+    id: "ready",
+    index: "05",
+    title: "lock in",
+    body: "start with today, then keep the record honest.",
+  },
+];
 
 function parseWorkoutVisualKey(key: string): {
   mode: WorkoutMode;
@@ -657,6 +705,198 @@ function SettingsSurface({
           <ActionText onPress={onSignIn}>apple</ActionText>
         )}
         <ActionText onPress={onEnableNotifications}>nudges</ActionText>
+      </View>
+    </View>
+  );
+}
+
+function OnboardingSurface({
+  authState,
+  healthSyncStatus,
+  notificationsEnabled,
+  onboardingState,
+  onApple,
+  onFinish,
+  onHealth,
+  onNotifications,
+}: {
+  authState: AuthState;
+  healthSyncStatus: HealthSyncStatus;
+  notificationsEnabled: boolean;
+  onboardingState: OnboardingState;
+  onApple: () => void;
+  onFinish: () => void;
+  onHealth: () => void;
+  onNotifications: () => void;
+}) {
+  const [stepIndex, setStepIndex] = useState(0);
+  const step = onboardingSteps[stepIndex];
+  const progress = useSharedValue(0);
+  const stageStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateY: (1 - progress.value) * 12 }],
+  }));
+  const progressStyle = useAnimatedStyle(() => ({
+    width: `${((stepIndex + 1) / onboardingSteps.length) * 100}%`,
+  }));
+  const accountReady =
+    authState.status === "signedIn" ||
+    onboardingState.accountConnectedAt !== null;
+  const healthReady =
+    healthSyncStatus === "synced" || onboardingState.healthConnectedAt !== null;
+  const nudgesReady =
+    notificationsEnabled || onboardingState.notificationsEnabledAt !== null;
+
+  useEffect(() => {
+    progress.value = 0;
+    progress.value = withTiming(1, {
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [progress, step.id]);
+
+  useEffect(() => {
+    if (step.id === "account" && accountReady) {
+      const timeout = setTimeout(() => setStepIndex(2), 520);
+
+      return () => clearTimeout(timeout);
+    }
+
+    if (step.id === "steps" && healthReady) {
+      const timeout = setTimeout(() => setStepIndex(3), 520);
+
+      return () => clearTimeout(timeout);
+    }
+
+    if (step.id === "nudges" && nudgesReady) {
+      const timeout = setTimeout(() => setStepIndex(4), 520);
+
+      return () => clearTimeout(timeout);
+    }
+
+    return undefined;
+  }, [accountReady, healthReady, nudgesReady, step.id]);
+
+  const primaryLabel =
+    step.id === "intro"
+      ? "begin"
+      : step.id === "account"
+        ? accountReady
+          ? "connected"
+          : "apple"
+        : step.id === "steps"
+          ? healthReady
+            ? "connected"
+            : healthSyncStatus === "syncing"
+              ? "connecting"
+              : "health"
+          : step.id === "nudges"
+            ? nudgesReady
+              ? "enabled"
+              : "nudges"
+            : "enter stead";
+  const primaryDisabled =
+    (step.id === "account" && accountReady) ||
+    (step.id === "steps" && (healthReady || healthSyncStatus === "syncing")) ||
+    (step.id === "nudges" && nudgesReady);
+  const statusItems = [
+    { label: "account", ready: accountReady },
+    { label: "steps", ready: healthReady },
+    { label: "nudges", ready: nudgesReady },
+  ];
+
+  const onPrimary = () => {
+    if (step.id === "intro") {
+      setStepIndex(1);
+      return;
+    }
+
+    if (step.id === "account") {
+      onApple();
+      return;
+    }
+
+    if (step.id === "steps") {
+      onHealth();
+      return;
+    }
+
+    if (step.id === "nudges") {
+      onNotifications();
+      return;
+    }
+
+    onFinish();
+  };
+
+  return (
+    <View style={styles.onboardingContent}>
+      <View style={styles.onboardingTop}>
+        <Text style={styles.titleText}>stead</Text>
+        <Text style={styles.metadataText}>{step.index} · setup</Text>
+      </View>
+
+      <View style={styles.onboardingStage}>
+        <Animated.View
+          key={step.id}
+          style={[styles.onboardingCopy, stageStyle]}
+        >
+          <Text style={styles.onboardingIndex}>{step.index}</Text>
+          <Text style={styles.onboardingTitle}>{step.title}</Text>
+          <Text style={styles.onboardingBody}>{step.body}</Text>
+        </Animated.View>
+
+        <View style={styles.onboardingStatus}>
+          {statusItems.map((item) => (
+            <View key={item.label} style={styles.onboardingStatusRow}>
+              <Text
+                style={[
+                  styles.metadataText,
+                  item.ready && styles.onboardingStatusReady,
+                ]}
+              >
+                {item.ready ? "-" : "·"}
+              </Text>
+              <Text
+                style={[
+                  styles.bodyText,
+                  item.ready
+                    ? styles.onboardingStatusReady
+                    : styles.onboardingStatusMuted,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.onboardingProgressTrack}>
+        <Animated.View style={[styles.onboardingProgressFill, progressStyle]} />
+      </View>
+
+      <View style={styles.bottomActions}>
+        <ActionText
+          disabled={stepIndex === 0}
+          onPress={() => setStepIndex((index) => Math.max(index - 1, 0))}
+        >
+          back
+        </ActionText>
+        {step.id !== "ready" ? (
+          <ActionText
+            onPress={() =>
+              setStepIndex((index) =>
+                Math.min(index + 1, onboardingSteps.length - 1),
+              )
+            }
+          >
+            later
+          </ActionText>
+        ) : null}
+        <ActionText disabled={primaryDisabled} onPress={onPrimary}>
+          {primaryLabel}
+        </ActionText>
       </View>
     </View>
   );
@@ -1218,6 +1458,14 @@ function Home() {
     createInitialAppState(),
   );
   const [hydrated, setHydrated] = useState(false);
+  const [onboardingHydrated, setOnboardingHydrated] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>({
+    version: 1,
+    completedAt: null,
+    accountConnectedAt: null,
+    healthConnectedAt: null,
+    notificationsEnabledAt: null,
+  });
   const [surface, setSurfaceState] = useState<Surface>("home");
   const { displayKey: surfaceShown, animatedStyle: surfaceOpacityStyle } =
     useSequentialCrossfade(surface, {
@@ -1307,6 +1555,13 @@ function Home() {
       }
     });
 
+    loadOnboardingState().then((stored) => {
+      if (!cancelled) {
+        setOnboardingState(stored);
+        setOnboardingHydrated(true);
+      }
+    });
+
     return () => {
       cancelled = true;
     };
@@ -1345,6 +1600,12 @@ function Home() {
     }
   }, [appState, hydrated]);
 
+  useEffect(() => {
+    if (onboardingHydrated) {
+      void saveOnboardingState(onboardingState);
+    }
+  }, [onboardingHydrated, onboardingState]);
+
   const syncHealthSteps = () => {
     setHealthSyncStatus("syncing");
 
@@ -1356,6 +1617,7 @@ function Home() {
         if (result.status === "success") {
           setAppState((state) => addStepSample(state, result.sample));
           setHealthSyncStatus("synced");
+          setOnboardingState((state) => markOnboardingHealthConnected(state));
         } else {
           setHealthSyncStatus("denied");
         }
@@ -1372,6 +1634,11 @@ function Home() {
         setAuthMessage(
           state.status === "signedIn" ? "sync account ready" : null,
         );
+        if (state.status === "signedIn") {
+          setOnboardingState((stored) =>
+            markOnboardingAccountConnected(stored),
+          );
+        }
       })
       .catch((error) =>
         setAuthMessage(
@@ -1401,6 +1668,11 @@ function Home() {
       secondsFromNow: 60 * 30,
     }).then((id) => {
       setNotificationsEnabled(id !== null);
+      if (id !== null) {
+        setOnboardingState((state) =>
+          markOnboardingNotificationsEnabled(state),
+        );
+      }
     });
   };
   const syncNow = () => {
@@ -1661,6 +1933,41 @@ function Home() {
 
     setAppState((state) => completeDailyItem(state, itemId));
   };
+  const finishOnboarding = () => {
+    setOnboardingState((state) => completeOnboarding(state));
+  };
+
+  if (!hydrated || !onboardingHydrated) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <StatusBar style="light" />
+        <View style={styles.onboardingContent}>
+          <View style={styles.onboardingStage}>
+            <Text style={styles.onboardingTitle}>stead</Text>
+            <Text style={styles.metadataText}>loading</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (onboardingState.completedAt === null) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <StatusBar style="light" />
+        <OnboardingSurface
+          authState={authState}
+          healthSyncStatus={healthSyncStatus}
+          notificationsEnabled={notificationsEnabled}
+          onboardingState={onboardingState}
+          onApple={signIn}
+          onFinish={finishOnboarding}
+          onHealth={syncHealthSteps}
+          onNotifications={enableNotifications}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -1876,6 +2183,77 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.screenTop,
+  },
+  onboardingContent: {
+    flex: 1,
+    paddingBottom: 34,
+    paddingHorizontal: spacing.screenX,
+    paddingTop: spacing.screenTop,
+  },
+  onboardingTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  onboardingStage: {
+    flex: 1,
+    justifyContent: "center",
+    paddingBottom: 72,
+  },
+  onboardingCopy: {
+    minHeight: 176,
+  },
+  onboardingIndex: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.index,
+    letterSpacing: 0,
+    lineHeight: 18,
+    marginBottom: 24,
+    opacity: opacity.metadata,
+  },
+  onboardingTitle: {
+    color: colors.foreground,
+    fontSize: 36,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 42,
+    opacity: opacity.title,
+  },
+  onboardingBody: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 25,
+    marginTop: 18,
+    maxWidth: 292,
+    opacity: opacity.body,
+  },
+  onboardingStatus: {
+    gap: 16,
+    marginTop: 56,
+  },
+  onboardingStatusRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
+  },
+  onboardingStatusMuted: {
+    opacity: opacity.metadata,
+  },
+  onboardingStatusReady: {
+    color: colors.success,
+    opacity: opacity.title,
+  },
+  onboardingProgressTrack: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+    height: 2,
+    marginBottom: 28,
+    overflow: "hidden",
+  },
+  onboardingProgressFill: {
+    backgroundColor: "rgba(255,255,255,0.72)",
+    height: 2,
   },
   workoutStage: {
     flex: 1,
