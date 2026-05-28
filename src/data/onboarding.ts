@@ -9,6 +9,7 @@ export type OnboardingState = {
   accountConnectedAt: number | null;
   healthConnectedAt: number | null;
   notificationsEnabledAt: number | null;
+  workoutPlanSetAt: number | null;
 };
 
 const initialOnboardingState: OnboardingState = {
@@ -17,6 +18,7 @@ const initialOnboardingState: OnboardingState = {
   accountConnectedAt: null,
   healthConnectedAt: null,
   notificationsEnabledAt: null,
+  workoutPlanSetAt: null,
 };
 
 export const onboardingStorage: StorageAdapter = AsyncStorage;
@@ -55,6 +57,7 @@ export function migrateOnboardingState(stored: unknown): OnboardingState {
     accountConnectedAt: numberOrNull(stored.accountConnectedAt),
     healthConnectedAt: numberOrNull(stored.healthConnectedAt),
     notificationsEnabledAt: numberOrNull(stored.notificationsEnabledAt),
+    workoutPlanSetAt: numberOrNull(stored.workoutPlanSetAt),
   };
 }
 
@@ -85,6 +88,16 @@ export function markOnboardingNotificationsEnabled(
   return {
     ...state,
     notificationsEnabledAt: enabledAt,
+  };
+}
+
+export function markOnboardingWorkoutPlanSet(
+  state: OnboardingState,
+  setAt = Date.now(),
+): OnboardingState {
+  return {
+    ...state,
+    workoutPlanSetAt: setAt,
   };
 }
 

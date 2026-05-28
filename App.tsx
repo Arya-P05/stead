@@ -1465,6 +1465,7 @@ function Home() {
     accountConnectedAt: null,
     healthConnectedAt: null,
     notificationsEnabledAt: null,
+    workoutPlanSetAt: null,
   });
   const [surface, setSurfaceState] = useState<Surface>("home");
   const { displayKey: surfaceShown, animatedStyle: surfaceOpacityStyle } =

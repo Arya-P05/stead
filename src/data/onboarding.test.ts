@@ -8,6 +8,7 @@ import {
   markOnboardingAccountConnected,
   markOnboardingHealthConnected,
   markOnboardingNotificationsEnabled,
+  markOnboardingWorkoutPlanSet,
   migrateOnboardingState,
   saveOnboardingState,
 } from "./onboarding";
@@ -32,6 +33,7 @@ describe("onboarding state", () => {
       accountConnectedAt: null,
       healthConnectedAt: null,
       notificationsEnabledAt: null,
+      workoutPlanSetAt: null,
     });
   });
 
@@ -43,6 +45,7 @@ describe("onboarding state", () => {
         accountConnectedAt: 1000,
         healthConnectedAt: undefined,
         notificationsEnabledAt: 3000,
+        workoutPlanSetAt: "done",
       }),
     ).toEqual({
       version: 1,
@@ -50,6 +53,7 @@ describe("onboarding state", () => {
       accountConnectedAt: 1000,
       healthConnectedAt: null,
       notificationsEnabledAt: 3000,
+      workoutPlanSetAt: null,
     });
   });
 
@@ -60,25 +64,30 @@ describe("onboarding state", () => {
       accountConnectedAt: null,
       healthConnectedAt: null,
       notificationsEnabledAt: null,
+      workoutPlanSetAt: null,
     };
 
     expect(
       completeOnboarding(
-        markOnboardingNotificationsEnabled(
-          markOnboardingHealthConnected(
-            markOnboardingAccountConnected(state, 1000),
-            2000,
+        markOnboardingWorkoutPlanSet(
+          markOnboardingNotificationsEnabled(
+            markOnboardingHealthConnected(
+              markOnboardingAccountConnected(state, 1000),
+              2000,
+            ),
+            3000,
           ),
-          3000,
+          4000,
         ),
-        4000,
+        5000,
       ),
     ).toEqual({
       version: 1,
-      completedAt: 4000,
+      completedAt: 5000,
       accountConnectedAt: 1000,
       healthConnectedAt: 2000,
       notificationsEnabledAt: 3000,
+      workoutPlanSetAt: 4000,
     });
   });
 
@@ -91,8 +100,9 @@ describe("onboarding state", () => {
         accountConnectedAt: 1000,
         healthConnectedAt: 2000,
         notificationsEnabledAt: 3000,
+        workoutPlanSetAt: 4000,
       },
-      4000,
+      5000,
     );
 
     await saveOnboardingState(state, storage);
