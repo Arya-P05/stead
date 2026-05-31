@@ -166,13 +166,7 @@ type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
 type Surface = "home" | "calendar" | "day" | "plan" | "settings";
-type OnboardingStepId =
-  | "intro"
-  | "account"
-  | "workouts"
-  | "steps"
-  | "nudges"
-  | "ready";
+type OnboardingStepId = "signal" | "workout" | "ready";
 
 const onboardingSteps: Array<{
   id: OnboardingStepId;
@@ -181,40 +175,22 @@ const onboardingSteps: Array<{
   body: string;
 }> = [
   {
-    id: "intro",
+    id: "signal",
     index: "01",
-    title: "stead",
-    body: "a quiet system for the next four months.",
+    title: "four months",
+    body: "a quiet operating system for the lock-in.",
   },
   {
-    id: "account",
+    id: "workout",
     index: "02",
-    title: "save the work",
-    body: "sync plans, lifts, steps, and outcomes.",
-  },
-  {
-    id: "workouts",
-    index: "03",
-    title: "set the split",
-    body: "pick a starter, then edit every lift.",
-  },
-  {
-    id: "steps",
-    index: "04",
-    title: "connect steps",
-    body: "healthkit only. no manual step entry.",
-  },
-  {
-    id: "nudges",
-    index: "05",
-    title: "allow nudges",
-    body: "short local reminders when the day drifts.",
+    title: "choose a split",
+    body: "start simple. edit every lift later.",
   },
   {
     id: "ready",
-    index: "06",
-    title: "lock in",
-    body: "start with today, then keep the record honest.",
+    index: "03",
+    title: "today starts",
+    body: "the app opens to one signal, one next move.",
   },
 ];
 
@@ -731,66 +707,69 @@ function SettingsSurface({
 }
 
 function OnboardingSurface({
-  authState,
-  healthSyncStatus,
-  notificationsEnabled,
   onboardingState,
   workoutPlan,
-  onApple,
-  onCustomizeWorkout,
   onFinish,
-  onHealth,
-  onNotifications,
   onPresetWorkout,
 }: {
-  authState: AuthState;
-  healthSyncStatus: HealthSyncStatus;
-  notificationsEnabled: boolean;
   onboardingState: OnboardingState;
   workoutPlan: WorkoutPlan;
-  onApple: () => void;
-  onCustomizeWorkout: () => void;
   onFinish: () => void;
-  onHealth: () => void;
-  onNotifications: () => void;
   onPresetWorkout: (presetId: WorkoutPresetId) => void;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
   const step = onboardingSteps[stepIndex];
-  const progress = useSharedValue(0);
+  const reveal = useSharedValue(0);
   const breathe = useSharedValue(0);
   const stageStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
+    opacity: reveal.value,
     transform: [
-      { translateY: (1 - progress.value) * 16 },
-      { scale: 0.985 + progress.value * 0.015 },
+      { translateY: (1 - reveal.value) * 14 },
+      { scale: 0.97 + reveal.value * 0.03 },
     ],
   }));
   const progressStyle = useAnimatedStyle(() => ({
     width: `${((stepIndex + 1) / onboardingSteps.length) * 100}%`,
   }));
-  const signalStyle = useAnimatedStyle(() => ({
-    opacity: 0.28 + breathe.value * 0.34,
-    transform: [{ scaleX: 0.72 + breathe.value * 0.28 }],
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.58 + breathe.value * 0.22,
+    transform: [
+      { scale: 0.96 + breathe.value * 0.05 },
+      { translateY: breathe.value * -4 },
+    ],
   }));
-  const accountReady =
-    authState.status === "signedIn" ||
-    onboardingState.accountConnectedAt !== null;
   const workoutReady = onboardingState.workoutPlanSetAt !== null;
-  const healthReady =
-    healthSyncStatus === "synced" || onboardingState.healthConnectedAt !== null;
-  const nudgesReady =
-    notificationsEnabled || onboardingState.notificationsEnabledAt !== null;
   const presets = getWorkoutPresets();
+  const selectedPreset = presets.find(
+    (preset) => preset.name === workoutPlan.name,
+  );
+  const metric =
+    step.id === "signal"
+      ? "120"
+      : step.id === "workout"
+        ? String(selectedPreset?.setCount ?? 17)
+        : "01";
+  const metricLabel =
+    step.id === "signal"
+      ? "days"
+      : step.id === "workout"
+        ? "sets planned"
+        : "next move";
+  const detail =
+    step.id === "signal"
+      ? "lock-in window"
+      : step.id === "workout"
+        ? workoutPlan.name
+        : "walk · workout · record";
 
   useEffect(() => {
-    progress.value = 0;
-    progress.value = withSpring(1, {
-      damping: 22,
-      stiffness: 180,
-      mass: 0.5,
+    reveal.value = 0;
+    reveal.value = withSpring(1, {
+      damping: 24,
+      stiffness: 170,
+      mass: 0.55,
     });
-  }, [progress, step.id]);
+  }, [reveal, step.id]);
 
   useEffect(() => {
     breathe.value = withRepeat(
@@ -803,203 +782,156 @@ function OnboardingSurface({
     );
   }, [breathe]);
 
-  useEffect(() => {
-    if (step.id === "account" && accountReady) {
-      const timeout = setTimeout(() => setStepIndex(2), 520);
-
-      return () => clearTimeout(timeout);
-    }
-
-    if (step.id === "workouts" && workoutReady) {
-      const timeout = setTimeout(() => setStepIndex(3), 640);
-
-      return () => clearTimeout(timeout);
-    }
-
-    if (step.id === "steps" && healthReady) {
-      const timeout = setTimeout(() => setStepIndex(4), 520);
-
-      return () => clearTimeout(timeout);
-    }
-
-    if (step.id === "nudges" && nudgesReady) {
-      const timeout = setTimeout(() => setStepIndex(5), 520);
-
-      return () => clearTimeout(timeout);
-    }
-
-    return undefined;
-  }, [accountReady, healthReady, nudgesReady, step.id, workoutReady]);
-
-  const primaryLabel =
-    step.id === "intro"
-      ? "begin"
-      : step.id === "account"
-        ? accountReady
-          ? "connected"
-          : "apple"
-        : step.id === "workouts"
-          ? workoutReady
-            ? "selected"
-            : "use push"
-          : step.id === "steps"
-            ? healthReady
-              ? "connected"
-              : healthSyncStatus === "syncing"
-                ? "connecting"
-                : "health"
-            : step.id === "nudges"
-              ? nudgesReady
-                ? "enabled"
-                : "nudges"
-              : "enter stead";
-  const primaryDisabled =
-    (step.id === "account" && accountReady) ||
-    (step.id === "workouts" && workoutReady) ||
-    (step.id === "steps" && (healthReady || healthSyncStatus === "syncing")) ||
-    (step.id === "nudges" && nudgesReady);
-  const statusItems = [
-    { label: "account", ready: accountReady },
-    { label: "workout", ready: workoutReady },
-    { label: "steps", ready: healthReady },
-    { label: "nudges", ready: nudgesReady },
-  ];
-
-  const onPrimary = () => {
-    if (step.id === "intro") {
-      setStepIndex(1);
-      return;
-    }
-
-    if (step.id === "account") {
-      onApple();
-      return;
-    }
-
-    if (step.id === "workouts") {
+  const goNext = () => {
+    if (step.id === "workout" && !workoutReady) {
       onPresetWorkout("push");
       return;
     }
 
-    if (step.id === "steps") {
-      onHealth();
+    if (step.id === "ready") {
+      onFinish();
       return;
     }
 
-    if (step.id === "nudges") {
-      onNotifications();
-      return;
-    }
-
-    onFinish();
+    setStepIndex((index) => Math.min(index + 1, onboardingSteps.length - 1));
   };
 
   return (
     <View style={styles.onboardingContent}>
       <View style={styles.onboardingTop}>
-        <Text style={styles.titleText}>stead</Text>
-        <Text style={styles.metadataText}>{step.index} · setup</Text>
+        <Text style={styles.onboardingBrand}>stead</Text>
+        <Text style={styles.onboardingMeta}>{step.index} · setup</Text>
       </View>
 
-      <View style={styles.onboardingStage}>
-        <Animated.View
-          key={step.id}
-          style={[styles.onboardingCopy, stageStyle]}
-        >
-          <Text style={styles.onboardingIndex}>{step.index}</Text>
+      <Animated.View key={step.id} style={[styles.onboardingStage, stageStyle]}>
+        <View style={styles.onboardingHeroCard}>
+          <Animated.View style={[styles.onboardingGlowOne, glowStyle]} />
+          <Animated.View style={[styles.onboardingGlowTwo, glowStyle]} />
+          <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
+          <Text style={styles.onboardingMetric}>{metric}</Text>
+          <Text style={styles.onboardingHeroDetail}>{detail}</Text>
+          <View style={styles.onboardingRuler}>
+            {Array.from({ length: 25 }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.onboardingTick,
+                  index === 12 && styles.onboardingTickActive,
+                  index % 4 === 0 && styles.onboardingTickTall,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.onboardingCopy}>
           <Text style={styles.onboardingTitle}>{step.title}</Text>
           <Text style={styles.onboardingBody}>{step.body}</Text>
-        </Animated.View>
-
-        <View style={styles.onboardingSignal}>
-          <Animated.View style={[styles.onboardingSignalFill, signalStyle]} />
         </View>
 
-        <View style={styles.onboardingStatus}>
-          {statusItems.map((item) => (
-            <View key={item.label} style={styles.onboardingStatusRow}>
-              <Text
-                style={[
-                  styles.metadataText,
-                  item.ready && styles.onboardingStatusReady,
-                ]}
-              >
-                {item.ready ? "-" : "·"}
-              </Text>
-              <Text
-                style={[
-                  styles.bodyText,
-                  item.ready
-                    ? styles.onboardingStatusReady
-                    : styles.onboardingStatusMuted,
-                ]}
-              >
-                {item.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {step.id === "workouts" ? (
+        {step.id === "workout" ? (
           <View style={styles.onboardingPresetList}>
-            {presets.map((preset, index) => (
+            {presets.map((preset) => (
               <PressableScale
                 key={preset.id}
                 onPress={() => onPresetWorkout(preset.id)}
-                style={styles.onboardingPresetRow}
+                scaleTo={0.98}
+                style={styles.onboardingPresetPill}
               >
-                <IndexText active={workoutPlan.name === preset.name}>
-                  {String(index + 1).padStart(2, "0")}
-                </IndexText>
-                <View style={styles.workoutExerciseCopy}>
-                  <Text
-                    style={[
-                      styles.workoutExerciseName,
-                      workoutPlan.name !== preset.name && styles.untrackedText,
-                    ]}
-                  >
-                    {preset.name}
-                  </Text>
-                  <Text style={styles.monoMeta}>
-                    {preset.exerciseCount} lifts · {preset.setCount} sets
-                  </Text>
-                </View>
+                <Text
+                  style={[
+                    styles.onboardingPresetText,
+                    workoutPlan.name === preset.name &&
+                      styles.onboardingPresetTextActive,
+                  ]}
+                >
+                  {preset.name}
+                </Text>
               </PressableScale>
             ))}
           </View>
         ) : null}
-      </View>
+
+        <View style={styles.onboardingDots}>
+          {onboardingSteps.map((item, index) => (
+            <View
+              key={item.id}
+              style={[
+                styles.onboardingDot,
+                index === stepIndex && styles.onboardingDotActive,
+              ]}
+            />
+          ))}
+        </View>
+      </Animated.View>
 
       <View style={styles.onboardingProgressTrack}>
         <Animated.View style={[styles.onboardingProgressFill, progressStyle]} />
       </View>
 
-      <View style={styles.bottomActions}>
-        <ActionText
+      <View style={styles.onboardingActions}>
+        <OnboardingAction
           disabled={stepIndex === 0}
+          label="back"
           onPress={() => setStepIndex((index) => Math.max(index - 1, 0))}
-        >
-          back
-        </ActionText>
-        {step.id !== "ready" ? (
-          <ActionText
-            onPress={() =>
-              setStepIndex((index) =>
-                Math.min(index + 1, onboardingSteps.length - 1),
-              )
-            }
-          >
-            skip
-          </ActionText>
-        ) : null}
-        {step.id === "workouts" ? (
-          <ActionText onPress={onCustomizeWorkout}>customize</ActionText>
-        ) : null}
-        <ActionText disabled={primaryDisabled} onPress={onPrimary}>
-          {primaryLabel}
-        </ActionText>
+        />
+        <OnboardingAction
+          label={
+            step.id === "workout" && !workoutReady
+              ? "use push"
+              : step.id === "ready"
+                ? "enter stead"
+                : "continue"
+          }
+          primary
+          onPress={goNext}
+        />
       </View>
     </View>
+  );
+}
+
+function OnboardingAction({
+  disabled,
+  label,
+  primary,
+  onPress,
+}: {
+  disabled?: boolean;
+  label: string;
+  primary?: boolean;
+  onPress: () => void;
+}) {
+  const press = async () => {
+    if (disabled) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress();
+  };
+
+  return (
+    <PressableScale
+      disabled={disabled}
+      onPress={press}
+      scaleTo={0.98}
+      style={[
+        styles.onboardingAction,
+        primary && styles.onboardingActionPrimary,
+        disabled && styles.onboardingActionDisabled,
+      ]}
+    >
+      <Text
+        style={[
+          styles.onboardingActionText,
+          primary && styles.onboardingActionTextPrimary,
+        ]}
+      >
+        {label}
+      </Text>
+    </PressableScale>
   );
 }
 
@@ -2100,19 +2032,9 @@ function Home() {
       <SafeAreaView style={styles.screen}>
         <StatusBar style="light" />
         <OnboardingSurface
-          authState={authState}
-          healthSyncStatus={healthSyncStatus}
-          notificationsEnabled={notificationsEnabled}
           onboardingState={onboardingState}
           workoutPlan={workoutPlan}
-          onApple={signIn}
-          onCustomizeWorkout={() => {
-            setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
-            openWorkout("plan");
-          }}
           onFinish={finishOnboarding}
-          onHealth={syncHealthSteps}
-          onNotifications={enableNotifications}
           onPresetWorkout={choosePresetWorkoutPlan}
         />
         <WorkoutSurface
@@ -2384,96 +2306,206 @@ const styles = StyleSheet.create({
     paddingTop: spacing.screenTop,
   },
   onboardingContent: {
+    backgroundColor: "#f4f3ef",
     flex: 1,
     paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.screenTop,
+    paddingTop: 48,
   },
   onboardingTop: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  onboardingBrand: {
+    color: "#1d1d1f",
+    fontSize: typeScale.body,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 24,
+  },
+  onboardingMeta: {
+    color: "#1d1d1f",
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: 0.42,
+  },
   onboardingStage: {
     flex: 1,
     justifyContent: "center",
-    paddingBottom: 72,
+    paddingBottom: 24,
   },
   onboardingCopy: {
-    minHeight: 176,
-  },
-  onboardingIndex: {
-    color: colors.foreground,
-    fontFamily: typography.mono,
-    fontSize: typeScale.index,
-    letterSpacing: 0,
-    lineHeight: 18,
-    marginBottom: 24,
-    opacity: opacity.metadata,
+    marginTop: 28,
   },
   onboardingTitle: {
-    color: colors.foreground,
-    fontSize: 36,
-    fontWeight: "600",
+    color: "#1d1d1f",
+    fontSize: 38,
+    fontWeight: "500",
     letterSpacing: 0,
-    lineHeight: 42,
-    opacity: opacity.title,
+    lineHeight: 44,
   },
   onboardingBody: {
-    color: colors.foreground,
+    color: "#5f5d58",
     fontSize: typeScale.body,
     letterSpacing: 0,
     lineHeight: 25,
-    marginTop: 18,
-    maxWidth: 292,
-    opacity: opacity.body,
+    marginTop: 10,
+    maxWidth: 310,
   },
-  onboardingSignal: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    height: 2,
-    marginTop: 34,
-    overflow: "hidden",
-    width: 148,
-  },
-  onboardingSignalFill: {
-    backgroundColor: colors.success,
-    height: 2,
-    transformOrigin: "left",
-    width: 148,
-  },
-  onboardingStatus: {
-    gap: 16,
-    marginTop: 56,
-  },
-  onboardingStatusRow: {
+  onboardingHeroCard: {
     alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.64)",
+    borderRadius: 34,
+    height: 350,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: "100%",
+  },
+  onboardingGlowOne: {
+    backgroundColor: "#ff7a1a",
+    borderRadius: 160,
+    height: 300,
+    opacity: 0.64,
+    position: "absolute",
+    right: -20,
+    top: 72,
+    width: 300,
+  },
+  onboardingGlowTwo: {
+    backgroundColor: "#c8d9e7",
+    borderRadius: 150,
+    height: 300,
+    left: -64,
+    opacity: 0.62,
+    position: "absolute",
+    top: -38,
+    width: 300,
+  },
+  onboardingHeroLabel: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontStyle: "italic",
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: 0.84,
+  },
+  onboardingMetric: {
+    color: "#ffffff",
+    fontFamily: typography.mono,
+    fontSize: 72,
+    fontWeight: "300",
+    letterSpacing: 0,
+    lineHeight: 86,
+    marginTop: 48,
+    opacity: 0.94,
+  },
+  onboardingHeroDetail: {
+    color: "#ffffff",
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: 0.84,
+  },
+  onboardingRuler: {
+    alignItems: "flex-end",
+    bottom: 42,
     flexDirection: "row",
-    gap: 14,
+    gap: 6,
+    height: 34,
+    position: "absolute",
   },
-  onboardingStatusMuted: {
-    opacity: opacity.metadata,
+  onboardingTick: {
+    backgroundColor: "rgba(255,255,255,0.42)",
+    height: 18,
+    width: 2,
   },
-  onboardingStatusReady: {
-    color: colors.success,
-    opacity: opacity.title,
+  onboardingTickTall: {
+    height: 28,
+  },
+  onboardingTickActive: {
+    backgroundColor: "#ffffff",
+    height: 34,
   },
   onboardingPresetList: {
-    gap: 18,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
     marginTop: 36,
   },
-  onboardingPresetRow: {
-    alignItems: "flex-start",
+  onboardingPresetPill: {
+    backgroundColor: "rgba(255,255,255,0.74)",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  onboardingPresetText: {
+    color: "#1d1d1f",
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 18,
+    opacity: 0.48,
+  },
+  onboardingPresetTextActive: {
+    opacity: 0.92,
+  },
+  onboardingDots: {
+    alignSelf: "center",
     flexDirection: "row",
+    gap: 8,
+    marginTop: 30,
+  },
+  onboardingDot: {
+    backgroundColor: "#1d1d1f",
+    borderRadius: 4,
+    height: 7,
+    opacity: 0.18,
+    width: 7,
+  },
+  onboardingDotActive: {
+    opacity: 0.72,
+    width: 14,
   },
   onboardingProgressTrack: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(29,29,31,0.10)",
     height: 2,
-    marginBottom: 28,
+    marginBottom: 24,
     overflow: "hidden",
   },
   onboardingProgressFill: {
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(29,29,31,0.62)",
     height: 2,
+  },
+  onboardingActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  onboardingAction: {
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  onboardingActionPrimary: {
+    backgroundColor: "#1d1d1f",
+    minWidth: 132,
+  },
+  onboardingActionDisabled: {
+    opacity: 0.25,
+  },
+  onboardingActionText: {
+    color: "#1d1d1f",
+    fontSize: typeScale.action,
+    letterSpacing: 0,
+    lineHeight: 22,
+    opacity: 0.52,
+    textAlign: "center",
+  },
+  onboardingActionTextPrimary: {
+    color: "#ffffff",
+    opacity: 0.92,
   },
   workoutStage: {
     flex: 1,
