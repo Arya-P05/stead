@@ -59,7 +59,7 @@ export function createCalendarMonth(
       date,
       label: date.slice(-2),
       tracked,
-      selectable: tracked && !future,
+      selectable: !future,
       future,
     });
 

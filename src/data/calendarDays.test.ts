@@ -34,20 +34,20 @@ describe("createCalendarMonth", () => {
         date: "2026-05-01",
         label: "01",
         tracked: false,
-        selectable: false,
+        selectable: true,
         future: false,
       },
       {
         date: "2026-05-02",
         label: "02",
         tracked: false,
-        selectable: false,
+        selectable: true,
         future: false,
       },
     ]);
   });
 
-  it("marks tracked days selectable and untracked days dimmed", () => {
+  it("marks tracked days while keeping past empty days selectable", () => {
     const month = createCalendarMonth(outcomes, "2026-05-11", "2026-05-01");
     const days = month.weeks.flat().filter((day) => day !== null);
 
@@ -57,7 +57,7 @@ describe("createCalendarMonth", () => {
     });
     expect(days.find((day) => day.date === "2026-05-10")).toMatchObject({
       tracked: false,
-      selectable: false,
+      selectable: true,
     });
     expect(days.find((day) => day.date === "2026-05-11")).toMatchObject({
       tracked: true,
