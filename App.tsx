@@ -120,6 +120,16 @@ import {
 
 const STEP_GOAL = 10000;
 
+function parsePlanNumber(value: string, minimum: number) {
+  const parsed = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
+
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return Math.max(minimum, parsed);
+}
+
 function createTodayContext(date = new Date()) {
   return {
     date: formatDateKey(date),
@@ -945,6 +955,37 @@ function addMonths(date: string, offset: number) {
   return parsed.toISOString().slice(0, 10);
 }
 
+function PlanNumberInput({
+  label,
+  minimum,
+  onChange,
+  value,
+}: {
+  label: string;
+  minimum: number;
+  onChange: (value: number) => void;
+  value: number;
+}) {
+  return (
+    <View style={styles.planNumberField}>
+      <Text style={styles.planNumberLabel}>{label}</Text>
+      <TextInput
+        keyboardType="number-pad"
+        onChangeText={(text) => {
+          const parsed = parsePlanNumber(text, minimum);
+
+          if (parsed !== null) {
+            onChange(parsed);
+          }
+        }}
+        selectTextOnFocus
+        style={styles.planNumberInput}
+        value={String(value)}
+      />
+    </View>
+  );
+}
+
 function HomeMiddleSurface({
   middle,
   onCompleteItem,
@@ -1317,45 +1358,43 @@ function WorkoutSurface({
                   style={styles.exerciseNameInput}
                   value={selectedPlanExercise.name}
                 />
-                <View style={styles.inlineActions}>
-                  <ActionText
-                    onPress={() =>
+                <View style={styles.planNumberGrid}>
+                  <PlanNumberInput
+                    label="sets"
+                    minimum={1}
+                    onChange={(targetSets) =>
+                      onUpdateExercise(selectedPlanExercise.id, { targetSets })
+                    }
+                    value={selectedPlanExercise.targetSets}
+                  />
+                  <PlanNumberInput
+                    label="reps"
+                    minimum={1}
+                    onChange={(targetReps) =>
+                      onUpdateExercise(selectedPlanExercise.id, { targetReps })
+                    }
+                    value={selectedPlanExercise.targetReps ?? 10}
+                  />
+                  <PlanNumberInput
+                    label="lb"
+                    minimum={0}
+                    onChange={(weightLb) =>
+                      onUpdateExercise(selectedPlanExercise.id, { weightLb })
+                    }
+                    value={selectedPlanExercise.weightLb ?? 0}
+                  />
+                  <PlanNumberInput
+                    label="rest"
+                    minimum={15}
+                    onChange={(restSeconds) =>
                       onUpdateExercise(selectedPlanExercise.id, {
-                        targetSets: selectedPlanExercise.targetSets + 1,
+                        restSeconds,
                       })
                     }
-                  >
-                    sets +1
-                  </ActionText>
-                  <ActionText
-                    onPress={() =>
-                      onUpdateExercise(selectedPlanExercise.id, {
-                        targetReps: (selectedPlanExercise.targetReps ?? 10) + 1,
-                      })
-                    }
-                  >
-                    reps +1
-                  </ActionText>
-                  <ActionText
-                    onPress={() =>
-                      onUpdateExercise(selectedPlanExercise.id, {
-                        weightLb: (selectedPlanExercise.weightLb ?? 0) + 5,
-                      })
-                    }
-                  >
-                    lb +5
-                  </ActionText>
+                    value={selectedPlanExercise.restSeconds}
+                  />
                 </View>
                 <View style={styles.inlineActions}>
-                  <ActionText
-                    onPress={() =>
-                      onUpdateExercise(selectedPlanExercise.id, {
-                        restSeconds: selectedPlanExercise.restSeconds + 15,
-                      })
-                    }
-                  >
-                    rest +15
-                  </ActionText>
                   <ActionText
                     disabled={planExerciseIndex === 0}
                     onPress={() => onMoveExercise(selectedPlanExercise.id, -1)}
@@ -3018,6 +3057,32 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginTop: 18,
     opacity: opacity.title,
+    padding: 0,
+  },
+  planNumberGrid: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 22,
+  },
+  planNumberField: {
+    flex: 1,
+    gap: 8,
+  },
+  planNumberLabel: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.index,
+    letterSpacing: 0,
+    lineHeight: 16,
+    opacity: opacity.metadata,
+  },
+  planNumberInput: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
     padding: 0,
   },
   planSurface: {
