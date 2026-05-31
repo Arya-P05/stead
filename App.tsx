@@ -123,6 +123,18 @@ import {
 } from "./src/domain/voiceLog";
 
 const STEP_GOAL = 10000;
+const digitDots: Record<string, string[]> = {
+  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+  "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+  "4": ["10010", "10010", "10010", "11111", "00010", "00010", "00010"],
+  "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
+  "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
+  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+  "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
+};
 
 function parsePlanNumber(value: string, minimum: number) {
   const parsed = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
@@ -840,7 +852,11 @@ function OnboardingSurface({
   };
 
   return (
-    <View style={styles.onboardingContent}>
+    <LinearGradient
+      colors={["#f8f7f3", "#f1f0ec", "#f6f3ef"]}
+      locations={[0, 0.54, 1]}
+      style={styles.onboardingContent}
+    >
       <View style={styles.onboardingTop}>
         <Text style={styles.onboardingBrand}>stead</Text>
         <Text style={styles.onboardingMeta}>{step.index} · setup</Text>
@@ -886,7 +902,7 @@ function OnboardingSurface({
               style={styles.onboardingGlassWash}
             />
             <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
-            <Text style={styles.onboardingMetric}>{metric}</Text>
+            <DottedMetric value={metric} />
             <Text style={styles.onboardingHeroDetail}>{detail}</Text>
             <View style={styles.onboardingRuler}>
               {Array.from({ length: 31 }).map((_, index) => (
@@ -966,7 +982,7 @@ function OnboardingSurface({
           onPress={goNext}
         />
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -1020,6 +1036,40 @@ function addMonths(date: string, offset: number) {
   parsed.setUTCMonth(parsed.getUTCMonth() + offset, 1);
 
   return parsed.toISOString().slice(0, 10);
+}
+
+function DottedMetric({ value }: { value: string }) {
+  return (
+    <View
+      accessibilityLabel={value}
+      accessibilityRole="text"
+      style={styles.dottedMetric}
+    >
+      {value.split("").map((digit, digitIndex) => {
+        const rows = digitDots[digit] ?? digitDots["0"];
+
+        return (
+          <View key={`${digit}-${digitIndex}`} style={styles.dottedDigit}>
+            {rows.map((row, rowIndex) => (
+              <View key={`${digit}-${rowIndex}`} style={styles.dottedRow}>
+                {row.split("").map((enabled, dotIndex) => (
+                  <View
+                    key={`${digit}-${rowIndex}-${dotIndex}`}
+                    style={[
+                      styles.dottedDot,
+                      enabled === "1"
+                        ? styles.dottedDotOn
+                        : styles.dottedDotOff,
+                    ]}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 function PlanNumberInput({
@@ -2576,36 +2626,53 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     opacity: 0.84,
   },
-  onboardingMetric: {
-    color: "#ffffff",
-    fontFamily: typography.mono,
-    fontSize: 80,
-    fontWeight: "300",
-    letterSpacing: 0,
-    lineHeight: 92,
+  dottedMetric: {
+    flexDirection: "row",
+    gap: 13,
     marginTop: 52,
-    opacity: 0.92,
-    textShadowColor: "rgba(255,255,255,0.24)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 14,
+  },
+  dottedDigit: {
+    gap: 6,
+  },
+  dottedRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  dottedDot: {
+    borderRadius: 3.25,
+    height: 6.5,
+    width: 6.5,
+  },
+  dottedDotOn: {
+    backgroundColor: "#ffffff",
+    opacity: 0.94,
+    shadowColor: "#ffffff",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.36,
+    shadowRadius: 7,
+  },
+  dottedDotOff: {
+    backgroundColor: "transparent",
+    opacity: 0,
   },
   onboardingHeroDetail: {
     color: "#ffffff",
     fontSize: typeScale.body,
     letterSpacing: 0,
     lineHeight: 24,
+    marginTop: 24,
     opacity: 0.84,
   },
   onboardingRuler: {
     alignItems: "flex-end",
-    bottom: 46,
+    bottom: 28,
     flexDirection: "row",
     gap: 5,
     height: 34,
     position: "absolute",
   },
   onboardingTick: {
-    backgroundColor: "rgba(255,255,255,0.34)",
+    backgroundColor: "rgba(255,255,255,0.30)",
     height: 17,
     width: 2,
   },
@@ -2656,13 +2723,13 @@ const styles = StyleSheet.create({
     width: 14,
   },
   onboardingProgressTrack: {
-    backgroundColor: "rgba(29,29,31,0.10)",
+    backgroundColor: "rgba(29,29,31,0.075)",
     height: 2,
     marginBottom: 24,
     overflow: "hidden",
   },
   onboardingProgressFill: {
-    backgroundColor: "rgba(29,29,31,0.62)",
+    backgroundColor: "rgba(29,29,31,0.54)",
     height: 2,
   },
   onboardingActions: {
@@ -2678,6 +2745,10 @@ const styles = StyleSheet.create({
   onboardingActionPrimary: {
     backgroundColor: "#1d1d1f",
     minWidth: 132,
+    shadowColor: "#1d1d1f",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
   },
   onboardingActionDisabled: {
     opacity: 0.25,
