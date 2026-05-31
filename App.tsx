@@ -858,9 +858,9 @@ function OnboardingSurface({
           <Animated.View style={[styles.onboardingAmbientLayer, glowStyle]}>
             <LinearGradient
               colors={[
-                "rgba(200,217,231,0.82)",
-                "rgba(216,210,223,0.42)",
-                "rgba(255,122,26,0.88)",
+                "rgba(200,217,231,0.92)",
+                "rgba(216,210,223,0.34)",
+                "rgba(255,122,26,0.98)",
               ]}
               locations={[0, 0.48, 1]}
               start={{ x: 0, y: 0 }}
@@ -868,17 +868,19 @@ function OnboardingSurface({
               style={styles.onboardingAmbientGradient}
             />
           </Animated.View>
+          <Animated.View style={[styles.onboardingWarmField, glowStyle]} />
+          <Animated.View style={[styles.onboardingCoolField, glowStyle]} />
           <BlurView
             experimentalBlurMethod="dimezisBlurView"
-            intensity={72}
+            intensity={44}
             style={styles.onboardingGlass}
             tint="light"
           >
             <LinearGradient
               colors={[
-                "rgba(255,255,255,0.52)",
-                "rgba(255,255,255,0.18)",
-                "rgba(255,255,255,0.42)",
+                "rgba(255,255,255,0.34)",
+                "rgba(255,255,255,0.08)",
+                "rgba(255,255,255,0.24)",
               ]}
               locations={[0, 0.52, 1]}
               style={styles.onboardingGlassWash}
@@ -2532,6 +2534,26 @@ const styles = StyleSheet.create({
     borderRadius: 190,
     flex: 1,
     transform: [{ rotate: "-10deg" }, { scaleX: 1.08 }],
+  },
+  onboardingWarmField: {
+    backgroundColor: "#ff7a1a",
+    borderRadius: 190,
+    bottom: 20,
+    height: 300,
+    opacity: 0.62,
+    position: "absolute",
+    right: -34,
+    width: 300,
+  },
+  onboardingCoolField: {
+    backgroundColor: "#c8d9e7",
+    borderRadius: 170,
+    height: 300,
+    left: -64,
+    opacity: 0.38,
+    position: "absolute",
+    top: -18,
+    width: 300,
   },
   onboardingGlass: {
     alignItems: "center",
