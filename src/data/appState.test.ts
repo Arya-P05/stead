@@ -17,6 +17,7 @@ import {
   reorderDailyItem,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
+  seedDailyPlanForWorkout,
   setActiveWorkoutPlan,
   updateDailyItem,
   upsertExerciseWeight,
@@ -143,6 +144,59 @@ describe("app state", () => {
       getDailyItemsForDate(deleted, "2026-05-18").map((item) => item.id),
     ).toEqual(["read"]);
     expect(deleted.dailyPlans[0].itemIds).toEqual(["read"]);
+  });
+
+  it("seeds a first usable day from the selected workout", () => {
+    const workoutPlan = {
+      ...createDefaultWorkoutPlan(),
+      id: "upper",
+      name: "upper",
+    };
+    const state = seedDailyPlanForWorkout(
+      createInitialAppState(),
+      "2026-05-31",
+      workoutPlan,
+      1000,
+    );
+
+    expect(
+      getDailyItemsForDate(state, "2026-05-31").map((item) => ({
+        title: item.title,
+        kind: item.kind,
+        workoutPlanId: item.workoutPlanId,
+      })),
+    ).toEqual([
+      { title: "walk", kind: "task", workoutPlanId: undefined },
+      { title: "upper", kind: "workout", workoutPlanId: "upper" },
+      { title: "read", kind: "task", workoutPlanId: undefined },
+    ]);
+    expect(state.dailyPlans[0]).toMatchObject({
+      date: "2026-05-31",
+      itemIds: [
+        "day-item-2026-05-31-walk",
+        "day-item-2026-05-31-upper",
+        "day-item-2026-05-31-read",
+      ],
+    });
+  });
+
+  it("does not overwrite an existing daily plan while onboarding", () => {
+    const planned = addDailyItem(createInitialAppState(), {
+      id: "custom",
+      date: "2026-05-31",
+      title: "deep work",
+      kind: "task",
+    });
+    const seeded = seedDailyPlanForWorkout(
+      planned,
+      "2026-05-31",
+      createDefaultWorkoutPlan(),
+      1000,
+    );
+
+    expect(getDailyItemsForDate(seeded, "2026-05-31")).toEqual(
+      getDailyItemsForDate(planned, "2026-05-31"),
+    );
   });
 
   it("stores workout outcomes newest first", () => {

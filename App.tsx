@@ -65,6 +65,7 @@ import {
   hasCompletedWorkoutOnDate,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
+  seedDailyPlanForWorkout,
   setActiveWorkoutPlan,
   updateDailyItem,
   upsertExerciseWeight,
@@ -1945,7 +1946,14 @@ function Home() {
     const createdAt = Date.now();
     const plan = createWorkoutPlanFromPreset(presetId, createdAt);
 
-    setAppState((state) => addWorkoutPlan(state, plan, createdAt));
+    setAppState((state) =>
+      seedDailyPlanForWorkout(
+        addWorkoutPlan(state, plan, createdAt),
+        today.date,
+        plan,
+        createdAt,
+      ),
+    );
     setWorkoutSession(startWorkoutSession(plan, createdAt));
     setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
   };

@@ -324,6 +324,53 @@ export function getDailyItemsForDate(state: AppState, date: string) {
     .sort((a, b) => a.position - b.position);
 }
 
+export function seedDailyPlanForWorkout(
+  state: AppState,
+  date: string,
+  workoutPlan: WorkoutPlan,
+  now = Date.now(),
+): AppState {
+  if (getDailyItemsForDate(state, date).length > 0) {
+    return state;
+  }
+
+  const seededItems: Array<{
+    id: string;
+    title: string;
+    kind: DailyItemKind;
+    workoutPlanId?: string;
+  }> = [
+    {
+      id: `day-item-${date}-walk`,
+      title: "walk",
+      kind: "task",
+    },
+    {
+      id: `day-item-${date}-${workoutPlan.id}`,
+      title: workoutPlan.name,
+      kind: "workout",
+      workoutPlanId: workoutPlan.id,
+    },
+    {
+      id: `day-item-${date}-read`,
+      title: "read",
+      kind: "task",
+    },
+  ];
+
+  return seededItems.reduce(
+    (nextState, item, position) =>
+      addDailyItem(nextState, {
+        ...item,
+        date,
+        position,
+        createdAt: now + position,
+        updatedAt: now + position,
+      }),
+    state,
+  );
+}
+
 export function addDailyItem(
   state: AppState,
   item: Omit<
