@@ -49,6 +49,24 @@ describe("chooseHomeMiddle", () => {
     });
   });
 
+  it("shows a calm cleared state when nothing is left", () => {
+    expect(
+      chooseHomeMiddle({
+        minutesWorked: 80,
+        recommendation: {
+          action: "keep going",
+          reason: "day is on track",
+          type: "steady",
+        },
+        remainingItems: [],
+      }),
+    ).toEqual({
+      type: "today",
+      meta: "clear today",
+      items: [],
+    });
+  });
+
   it("shows what's next when the next item is a workout", () => {
     expect(
       chooseHomeMiddle({

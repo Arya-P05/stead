@@ -57,6 +57,14 @@ export function chooseHomeMiddle({
     };
   }
 
+  if (remainingItems.length === 0) {
+    return {
+      type: "today",
+      meta: "clear today",
+      items: [],
+    };
+  }
+
   return {
     type: "today",
     meta: `${remainingItems.length === 3 ? "three" : remainingItems.length} left today`,

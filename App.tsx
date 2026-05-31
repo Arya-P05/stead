@@ -983,25 +983,34 @@ function HomeMiddleSurface({
   return (
     <View style={styles.homeMiddle}>
       <Text style={styles.homeMeta}>{middle.meta}</Text>
-      <View style={styles.todayThreeList}>
-        {middle.items.map((item, index) => (
-          <PressableScale
-            key={`${item.title}-${index}`}
-            onPress={() =>
-              item.action === "workout" ? onWorkout() : onCompleteItem(item.id)
-            }
-            style={styles.todayThreeRow}
-          >
-            <Text style={styles.indexText}>
-              {String(index + 1).padStart(2, "0")}
-            </Text>
-            <Text style={styles.todayThreeTitle}>{item.title}</Text>
-            <Text style={styles.todayThreeAction}>
-              {item.action === "workout" ? "start" : "do"}
-            </Text>
-          </PressableScale>
-        ))}
-      </View>
+      {middle.items.length === 0 ? (
+        <View style={styles.nudgeLine}>
+          <Text style={styles.momentPhrase}>nothing else needs you.</Text>
+          <Text style={styles.momentAction}>stay steady</Text>
+        </View>
+      ) : (
+        <View style={styles.todayThreeList}>
+          {middle.items.map((item, index) => (
+            <PressableScale
+              key={`${item.title}-${index}`}
+              onPress={() =>
+                item.action === "workout"
+                  ? onWorkout()
+                  : onCompleteItem(item.id)
+              }
+              style={styles.todayThreeRow}
+            >
+              <Text style={styles.indexText}>
+                {String(index + 1).padStart(2, "0")}
+              </Text>
+              <Text style={styles.todayThreeTitle}>{item.title}</Text>
+              <Text style={styles.todayThreeAction}>
+                {item.action === "workout" ? "start" : "do"}
+              </Text>
+            </PressableScale>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
