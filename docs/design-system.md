@@ -2,6 +2,8 @@
 
 stead is a quiet iOS command surface for personal momentum. It should feel calm, direct, and almost invisible until it needs to help.
 
+For onboarding, setup, recap, and insight surfaces, follow `docs/soft-clinical-futurism.md`. That direction is now the default for first-run and reflective experiences. The black system below remains the live mode for home, workouts, rest, voice logging, and urgent nudges.
+
 ## visual language
 
 - Background: pure black (`#000000`) across the main app and sheets.
