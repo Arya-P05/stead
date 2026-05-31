@@ -12,6 +12,7 @@ import {
   duplicateWorkoutPlan,
   getActiveWorkoutPlan,
   getDailyItemsForDate,
+  getStepsForDate,
   hasCompletedWorkout,
   hasCompletedWorkoutOnDate,
   reorderDailyItem,
@@ -359,5 +360,23 @@ describe("app state", () => {
       { capturedAt: 2000, steps: 6400, source: "health" },
       { capturedAt: 1000, steps: 5200, source: "health" },
     ]);
+  });
+
+  it("reads steps for the requested date only", () => {
+    const state = addStepSample(
+      addStepSample(createInitialAppState(), {
+        capturedAt: new Date("2026-05-30T12:00:00").getTime(),
+        steps: 9000,
+        source: "health",
+      }),
+      {
+        capturedAt: new Date("2026-05-31T12:00:00").getTime(),
+        steps: 4200,
+        source: "health",
+      },
+    );
+
+    expect(getStepsForDate(state, "2026-05-31")).toBe(4200);
+    expect(getStepsForDate(state, "2026-06-01")).toBe(0);
   });
 });

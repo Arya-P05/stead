@@ -63,6 +63,7 @@ import {
   duplicateWorkoutPlan,
   getActiveWorkoutPlan,
   getDailyItemsForDate,
+  getStepsForDate,
   hasCompletedWorkoutOnDate,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
@@ -1609,7 +1610,7 @@ function Home() {
   );
   const workoutPlan = getActiveWorkoutPlan(appState);
   const loggedSets = workoutSession.sets.length;
-  const latestSteps = appState.stepSamples[0]?.steps ?? 0;
+  const latestSteps = getStepsForDate(appState, today.date);
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
   const workoutComplete = hasCompletedWorkoutOnDate(
     appState,

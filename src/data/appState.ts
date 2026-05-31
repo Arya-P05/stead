@@ -318,6 +318,14 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
   };
 }
 
+export function getStepsForDate(state: AppState, date: string) {
+  return (
+    state.stepSamples.find(
+      (sample) => formatDateKey(new Date(sample.capturedAt)) === date,
+    )?.steps ?? 0
+  );
+}
+
 export function getDailyItemsForDate(state: AppState, date: string) {
   return state.dailyItems
     .filter((item) => item.date === date)
