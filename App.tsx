@@ -2029,8 +2029,8 @@ function Home() {
 
   if (onboardingState.completedAt === null) {
     return (
-      <SafeAreaView style={styles.screen}>
-        <StatusBar style="light" />
+      <SafeAreaView style={styles.onboardingScreen}>
+        <StatusBar style="dark" />
         <OnboardingSurface
           onboardingState={onboardingState}
           workoutPlan={workoutPlan}
@@ -2277,6 +2277,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  onboardingScreen: {
+    backgroundColor: "#f4f3ef",
+    flex: 1,
   },
   content: {
     flex: 1,
