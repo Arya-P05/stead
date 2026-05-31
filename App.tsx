@@ -65,6 +65,7 @@ import {
   getDailyItemsForDate,
   getStepsForDate,
   hasCompletedWorkoutOnDate,
+  reorderDailyItem,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
   seedDailyPlanForWorkout,
@@ -475,6 +476,7 @@ function DayPlanSurface({
   onBack,
   onCompleteItem,
   onDeleteItem,
+  onMoveItem,
   onRenameItem,
   workoutPlan,
 }: {
@@ -484,12 +486,16 @@ function DayPlanSurface({
   onBack: () => void;
   onCompleteItem: (itemId: string) => void;
   onDeleteItem: (itemId: string) => void;
+  onMoveItem: (itemId: string, direction: -1 | 1) => void;
   onRenameItem: (itemId: string, title: string) => void;
   workoutPlan: WorkoutPlan;
 }) {
   const [draft, setDraft] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const selectedItem = items.find((item) => item.id === selectedItemId);
+  const selectedItemIndex = selectedItem
+    ? items.findIndex((item) => item.id === selectedItem.id)
+    : -1;
 
   useEffect(() => {
     setSelectedItemId(null);
@@ -576,6 +582,23 @@ function DayPlanSurface({
         style={styles.planInput}
         value={draft}
       />
+
+      {selectedItem ? (
+        <View style={styles.inlineActions}>
+          <ActionText
+            disabled={selectedItemIndex <= 0}
+            onPress={() => onMoveItem(selectedItem.id, -1)}
+          >
+            up
+          </ActionText>
+          <ActionText
+            disabled={selectedItemIndex >= items.length - 1}
+            onPress={() => onMoveItem(selectedItem.id, 1)}
+          >
+            down
+          </ActionText>
+        </View>
+      ) : null}
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
@@ -2264,6 +2287,9 @@ function Home() {
             onCompleteItem={completePlanItem}
             onDeleteItem={(itemId) =>
               setAppState((state) => deleteDailyItem(state, itemId))
+            }
+            onMoveItem={(itemId, direction) =>
+              setAppState((state) => reorderDailyItem(state, itemId, direction))
             }
             onRenameItem={renamePlanItem}
             workoutPlan={workoutPlan}
