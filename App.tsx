@@ -599,6 +599,11 @@ function DayPlanSurface({
             </ActionText>
           </>
         ) : null}
+        {!selectedItem ? (
+          <ActionText onPress={() => onAddItem(workoutPlan.name)}>
+            workout
+          </ActionText>
+        ) : null}
         <ActionText disabled={!draft.trim()} onPress={submitDraft}>
           {selectedItem ? "save" : "add"}
         </ActionText>
