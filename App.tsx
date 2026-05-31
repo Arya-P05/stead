@@ -1,7 +1,5 @@
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
-import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   AppState as NativeAppState,
@@ -123,18 +121,6 @@ import {
 } from "./src/domain/voiceLog";
 
 const STEP_GOAL = 10000;
-const digitDots: Record<string, string[]> = {
-  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
-  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
-  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
-  "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
-  "4": ["10010", "10010", "10010", "11111", "00010", "00010", "00010"],
-  "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
-  "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
-  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
-  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
-  "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
-};
 
 function parsePlanNumber(value: string, minimum: number) {
   const parsed = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
@@ -775,46 +761,26 @@ function OnboardingSurface({
   const [stepIndex, setStepIndex] = useState(0);
   const step = onboardingSteps[stepIndex];
   const reveal = useSharedValue(0);
-  const breathe = useSharedValue(0);
   const stageStyle = useAnimatedStyle(() => ({
     opacity: reveal.value,
-    transform: [
-      { translateY: (1 - reveal.value) * 14 },
-      { scale: 0.97 + reveal.value * 0.03 },
-    ],
+    transform: [{ translateY: (1 - reveal.value) * 10 }],
   }));
   const progressStyle = useAnimatedStyle(() => ({
     width: `${((stepIndex + 1) / onboardingSteps.length) * 100}%`,
   }));
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.58 + breathe.value * 0.22,
-    transform: [
-      { scale: 0.96 + breathe.value * 0.05 },
-      { translateY: breathe.value * -4 },
-    ],
-  }));
   const workoutReady = onboardingState.workoutPlanSetAt !== null;
   const presets = getWorkoutPresets();
-  const selectedPreset = presets.find(
-    (preset) => preset.name === workoutPlan.name,
-  );
-  const metric =
-    step.id === "signal"
-      ? "120"
-      : step.id === "workout"
-        ? String(selectedPreset?.setCount ?? 17)
-        : "01";
   const metricLabel =
     step.id === "signal"
-      ? "days"
+      ? "setup"
       : step.id === "workout"
-        ? "sets planned"
-        : "next move";
+        ? "workout"
+        : "ready";
   const detail =
     step.id === "signal"
-      ? "lock-in window"
+      ? "120 days · one day at a time"
       : step.id === "workout"
-        ? workoutPlan.name
+        ? `${workoutPlan.name} · ${formatWorkoutPlanMeta(workoutPlan)}`
         : "walk · workout · record";
 
   useEffect(() => {
@@ -825,17 +791,6 @@ function OnboardingSurface({
       mass: 0.55,
     });
   }, [reveal, step.id]);
-
-  useEffect(() => {
-    breathe.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.cubic) }),
-        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.cubic) }),
-      ),
-      -1,
-      false,
-    );
-  }, [breathe]);
 
   const goNext = () => {
     if (step.id === "workout" && !workoutReady) {
@@ -852,75 +807,19 @@ function OnboardingSurface({
   };
 
   return (
-    <LinearGradient
-      colors={["#f8f7f3", "#f1f0ec", "#f6f3ef"]}
-      locations={[0, 0.54, 1]}
-      style={styles.onboardingContent}
-    >
+    <View style={styles.onboardingContent}>
       <View style={styles.onboardingTop}>
         <Text style={styles.onboardingBrand}>stead</Text>
-        <Text style={styles.onboardingMeta}>{step.index} · setup</Text>
+        <Text style={styles.onboardingMeta}>
+          {step.index} of {String(onboardingSteps.length).padStart(2, "0")}
+        </Text>
       </View>
 
       <Animated.View key={step.id} style={[styles.onboardingStage, stageStyle]}>
-        <View style={styles.onboardingHeroCard}>
-          <LinearGradient
-            colors={["#eef4f7", "#f6f1ea", "#f8eee8"]}
-            locations={[0, 0.48, 1]}
-            start={{ x: 0.1, y: 0.02 }}
-            end={{ x: 0.95, y: 1 }}
-            style={styles.onboardingHeroBase}
-          />
-          <Animated.View style={[styles.onboardingAmbientLayer, glowStyle]}>
-            <LinearGradient
-              colors={[
-                "rgba(200,217,231,0.92)",
-                "rgba(216,210,223,0.34)",
-                "rgba(255,122,26,0.98)",
-              ]}
-              locations={[0, 0.48, 1]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.onboardingAmbientGradient}
-            />
-          </Animated.View>
-          <Animated.View style={[styles.onboardingWarmField, glowStyle]} />
-          <Animated.View style={[styles.onboardingCoolField, glowStyle]} />
-          <BlurView
-            experimentalBlurMethod="dimezisBlurView"
-            intensity={44}
-            style={styles.onboardingGlass}
-            tint="light"
-          >
-            <LinearGradient
-              colors={[
-                "rgba(255,255,255,0.34)",
-                "rgba(255,255,255,0.08)",
-                "rgba(255,255,255,0.24)",
-              ]}
-              locations={[0, 0.52, 1]}
-              style={styles.onboardingGlassWash}
-            />
-            <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
-            <DottedMetric value={metric} />
-            <Text style={styles.onboardingHeroDetail}>{detail}</Text>
-            <View style={styles.onboardingRuler}>
-              {Array.from({ length: 31 }).map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.onboardingTick,
-                    index === 15 && styles.onboardingTickActive,
-                    index % 5 === 0 && styles.onboardingTickTall,
-                  ]}
-                />
-              ))}
-            </View>
-          </BlurView>
-        </View>
-
-        <View style={styles.onboardingCopy}>
+        <View style={styles.onboardingMiddle}>
+          <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
           <Text style={styles.onboardingTitle}>{step.title}</Text>
+          <Text style={styles.onboardingHeroDetail}>{detail}</Text>
           <Text style={styles.onboardingBody}>{step.body}</Text>
         </View>
 
@@ -982,7 +881,7 @@ function OnboardingSurface({
           onPress={goNext}
         />
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -1036,40 +935,6 @@ function addMonths(date: string, offset: number) {
   parsed.setUTCMonth(parsed.getUTCMonth() + offset, 1);
 
   return parsed.toISOString().slice(0, 10);
-}
-
-function DottedMetric({ value }: { value: string }) {
-  return (
-    <View
-      accessibilityLabel={value}
-      accessibilityRole="text"
-      style={styles.dottedMetric}
-    >
-      {value.split("").map((digit, digitIndex) => {
-        const rows = digitDots[digit] ?? digitDots["0"];
-
-        return (
-          <View key={`${digit}-${digitIndex}`} style={styles.dottedDigit}>
-            {rows.map((row, rowIndex) => (
-              <View key={`${digit}-${rowIndex}`} style={styles.dottedRow}>
-                {row.split("").map((enabled, dotIndex) => (
-                  <View
-                    key={`${digit}-${rowIndex}-${dotIndex}`}
-                    style={[
-                      styles.dottedDot,
-                      enabled === "1"
-                        ? styles.dottedDotOn
-                        : styles.dottedDotOff,
-                    ]}
-                  />
-                ))}
-              </View>
-            ))}
-          </View>
-        );
-      })}
-    </View>
-  );
 }
 
 function PlanNumberInput({
@@ -2223,7 +2088,7 @@ function Home() {
   if (onboardingState.completedAt === null) {
     return (
       <SafeAreaView style={styles.onboardingScreen}>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         <OnboardingSurface
           onboardingState={onboardingState}
           workoutPlan={workoutPlan}
@@ -2475,7 +2340,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   onboardingScreen: {
-    backgroundColor: "#f4f3ef",
+    backgroundColor: colors.background,
     flex: 1,
   },
   content: {
@@ -2506,11 +2371,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.screenTop,
   },
   onboardingContent: {
-    backgroundColor: "#f2f1ed",
+    backgroundColor: colors.background,
     flex: 1,
     paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
-    paddingTop: 48,
+    paddingTop: spacing.screenTop,
   },
   onboardingTop: {
     alignItems: "center",
@@ -2518,192 +2383,78 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   onboardingBrand: {
-    color: "#1d1d1f",
-    fontSize: typeScale.body,
+    color: colors.foreground,
+    fontSize: typeScale.title,
     fontWeight: "600",
     letterSpacing: 0,
-    lineHeight: 24,
+    lineHeight: 26,
+    opacity: opacity.title,
   },
   onboardingMeta: {
-    color: "#1d1d1f",
+    color: colors.foreground,
+    fontFamily: typography.mono,
     fontSize: typeScale.metadata,
     letterSpacing: 0,
     lineHeight: 19,
-    opacity: 0.42,
+    opacity: opacity.metadata,
   },
   onboardingStage: {
     flex: 1,
     justifyContent: "center",
-    paddingBottom: 24,
+    paddingBottom: 74,
   },
-  onboardingCopy: {
-    marginTop: 28,
+  onboardingMiddle: {
+    gap: 10,
   },
   onboardingTitle: {
-    color: "#1d1d1f",
-    fontSize: 38,
-    fontWeight: "500",
+    color: colors.foreground,
+    fontSize: 36,
+    fontWeight: "600",
     letterSpacing: 0,
-    lineHeight: 44,
+    lineHeight: 42,
+    opacity: opacity.title,
   },
   onboardingBody: {
-    color: "#5f5d58",
+    color: colors.foreground,
     fontSize: typeScale.body,
     letterSpacing: 0,
     lineHeight: 25,
     marginTop: 10,
     maxWidth: 310,
-  },
-  onboardingHeroCard: {
-    alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "rgba(255,255,255,0.42)",
-    borderColor: "rgba(255,255,255,0.72)",
-    borderRadius: 38,
-    borderWidth: 1,
-    height: 360,
-    justifyContent: "center",
-    overflow: "hidden",
-    shadowColor: "#a8a5a0",
-    shadowOffset: { width: 0, height: 26 },
-    shadowOpacity: 0.24,
-    shadowRadius: 42,
-    width: "100%",
-  },
-  onboardingHeroBase: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  onboardingAmbientLayer: {
-    bottom: -54,
-    height: 390,
-    left: -50,
-    position: "absolute",
-    right: -50,
-  },
-  onboardingAmbientGradient: {
-    borderRadius: 190,
-    flex: 1,
-    transform: [{ rotate: "-10deg" }, { scaleX: 1.08 }],
-  },
-  onboardingWarmField: {
-    backgroundColor: "#ff7a1a",
-    borderRadius: 190,
-    bottom: 20,
-    height: 300,
-    opacity: 0.62,
-    position: "absolute",
-    right: -34,
-    width: 300,
-  },
-  onboardingCoolField: {
-    backgroundColor: "#c8d9e7",
-    borderRadius: 170,
-    height: 300,
-    left: -64,
-    opacity: 0.38,
-    position: "absolute",
-    top: -18,
-    width: 300,
-  },
-  onboardingGlass: {
-    alignItems: "center",
-    borderColor: "rgba(255,255,255,0.48)",
-    borderRadius: 34,
-    borderWidth: 1,
-    height: "94%",
-    justifyContent: "center",
-    overflow: "hidden",
-    width: "94%",
-  },
-  onboardingGlassWash: {
-    ...StyleSheet.absoluteFillObject,
+    opacity: opacity.metadata,
   },
   onboardingHeroLabel: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontStyle: "italic",
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
     letterSpacing: 0,
-    lineHeight: 24,
-    opacity: 0.84,
-  },
-  dottedMetric: {
-    flexDirection: "row",
-    gap: 13,
-    marginTop: 52,
-  },
-  dottedDigit: {
-    gap: 6,
-  },
-  dottedRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  dottedDot: {
-    borderRadius: 3.25,
-    height: 6.5,
-    width: 6.5,
-  },
-  dottedDotOn: {
-    backgroundColor: "#ffffff",
-    opacity: 0.94,
-    shadowColor: "#ffffff",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.36,
-    shadowRadius: 7,
-  },
-  dottedDotOff: {
-    backgroundColor: "transparent",
-    opacity: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
   },
   onboardingHeroDetail: {
-    color: "#ffffff",
+    color: colors.foreground,
+    fontFamily: typography.mono,
     fontSize: typeScale.body,
     letterSpacing: 0,
     lineHeight: 24,
-    marginTop: 24,
-    opacity: 0.84,
-  },
-  onboardingRuler: {
-    alignItems: "flex-end",
-    bottom: 28,
-    flexDirection: "row",
-    gap: 5,
-    height: 34,
-    position: "absolute",
-  },
-  onboardingTick: {
-    backgroundColor: "rgba(255,255,255,0.30)",
-    height: 17,
-    width: 2,
-  },
-  onboardingTickTall: {
-    height: 27,
-  },
-  onboardingTickActive: {
-    backgroundColor: "#ffffff",
-    height: 34,
+    opacity: opacity.metadata,
   },
   onboardingPresetList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 36,
+    gap: 18,
+    marginTop: -48,
   },
   onboardingPresetPill: {
-    backgroundColor: "rgba(255,255,255,0.74)",
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 2,
   },
   onboardingPresetText: {
-    color: "#1d1d1f",
-    fontSize: typeScale.metadata,
+    color: colors.foreground,
+    fontSize: typeScale.body,
     letterSpacing: 0,
-    lineHeight: 18,
-    opacity: 0.48,
+    lineHeight: 24,
+    opacity: opacity.metadata,
   },
   onboardingPresetTextActive: {
-    opacity: 0.92,
+    fontWeight: "600",
+    opacity: opacity.title,
   },
   onboardingDots: {
     alignSelf: "center",
@@ -2712,7 +2463,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   onboardingDot: {
-    backgroundColor: "#1d1d1f",
+    backgroundColor: colors.foreground,
     borderRadius: 4,
     height: 7,
     opacity: 0.18,
@@ -2723,13 +2474,13 @@ const styles = StyleSheet.create({
     width: 14,
   },
   onboardingProgressTrack: {
-    backgroundColor: "rgba(29,29,31,0.075)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     height: 2,
     marginBottom: 24,
     overflow: "hidden",
   },
   onboardingProgressFill: {
-    backgroundColor: "rgba(29,29,31,0.54)",
+    backgroundColor: "rgba(255,255,255,0.72)",
     height: 2,
   },
   onboardingActions: {
@@ -2743,18 +2494,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   onboardingActionPrimary: {
-    backgroundColor: "#1d1d1f",
     minWidth: 132,
-    shadowColor: "#1d1d1f",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
   },
   onboardingActionDisabled: {
     opacity: 0.25,
   },
   onboardingActionText: {
-    color: "#1d1d1f",
+    color: colors.foreground,
     fontSize: typeScale.action,
     letterSpacing: 0,
     lineHeight: 22,
@@ -2762,7 +2508,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   onboardingActionTextPrimary: {
-    color: "#ffffff",
+    color: colors.foreground,
     opacity: 0.92,
   },
   workoutStage: {
