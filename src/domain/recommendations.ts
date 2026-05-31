@@ -21,6 +21,7 @@ export type DayState = {
     planned: boolean;
     completed: boolean;
     name: string;
+    active?: boolean;
   };
 };
 
@@ -43,6 +44,14 @@ export function chooseRecommendation(day: DayState): Recommendation {
       action: "prep for next thing",
       reason: `starts in ${day.minutesUntilNextEvent} min`,
       type: "calendar",
+    };
+  }
+
+  if (day.workout.planned && day.workout.active && !day.workout.completed) {
+    return {
+      action: `continue ${day.workout.name}`,
+      reason: "session in progress",
+      type: "workout",
     };
   }
 

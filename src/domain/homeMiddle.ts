@@ -48,12 +48,14 @@ export function chooseHomeMiddle({
   }
 
   if (recommendation.type === "workout") {
+    const continuing = recommendation.action.startsWith("continue ");
+
     return {
       type: "next",
       label: "next",
-      title: recommendation.action.replace("start ", ""),
+      title: recommendation.action.replace(/^(start|continue) /, ""),
       meta: workoutMeta ?? "planned workout",
-      action: "start now",
+      action: continuing ? "continue" : "start now",
     };
   }
 

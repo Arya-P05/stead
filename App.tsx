@@ -1675,6 +1675,8 @@ function Home() {
       planned: true,
       completed: workoutComplete,
       name: workoutPlan.name,
+      active:
+        workoutSession.sets.length > 0 && workoutSession.completedAt === null,
     },
   });
   const homeMiddle = chooseHomeMiddle({

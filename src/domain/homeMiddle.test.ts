@@ -87,4 +87,25 @@ describe("chooseHomeMiddle", () => {
       action: "start now",
     });
   });
+
+  it("uses continue copy for an active workout", () => {
+    expect(
+      chooseHomeMiddle({
+        minutesWorked: 80,
+        recommendation: {
+          action: "continue push day",
+          reason: "session in progress",
+          type: "workout",
+        },
+        remainingItems: [{ id: "push", title: "push day", action: "workout" }],
+        workoutMeta: "5 lifts · 16 sets",
+      }),
+    ).toEqual({
+      type: "next",
+      label: "next",
+      title: "push day",
+      meta: "5 lifts · 16 sets",
+      action: "continue",
+    });
+  });
 });

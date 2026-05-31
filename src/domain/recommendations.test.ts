@@ -40,6 +40,22 @@ describe("chooseRecommendation", () => {
     });
   });
 
+  it("continues an active workout before suggesting a walk", () => {
+    expect(
+      chooseRecommendation({
+        ...baseDay,
+        workout: {
+          ...baseDay.workout,
+          active: true,
+        },
+      }),
+    ).toEqual({
+      action: "continue upper push",
+      reason: "session in progress",
+      type: "workout",
+    });
+  });
+
   it("protects calendar prep when an event is close", () => {
     expect(
       chooseRecommendation({
