@@ -117,6 +117,10 @@ export function updateExercise(
         ? {
             ...exercise,
             ...patch,
+            name:
+              patch.name === undefined || patch.name.trim().length === 0
+                ? exercise.name
+                : patch.name,
             targetSets: clampInt(patch.targetSets ?? exercise.targetSets, 1),
             targetReps: clampInt(
               patch.targetReps ?? exercise.targetReps ?? 1,

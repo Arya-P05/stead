@@ -35,6 +35,15 @@ describe("workout plan", () => {
     expect(updated.exercises[1]).toEqual(plan.exercises[1]);
   });
 
+  it("keeps the previous exercise name when an edit is blank", () => {
+    const plan = createDefaultWorkoutPlan();
+    const updated = updateExercise(plan, "incline-db-press", {
+      name: "   ",
+    });
+
+    expect(updated.exercises[0].name).toBe("incline dumbbell press");
+  });
+
   it("keeps exercise values usable", () => {
     const plan = createDefaultWorkoutPlan();
     const updated = updateExercise(plan, "incline-db-press", {

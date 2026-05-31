@@ -1872,11 +1872,7 @@ function Home() {
     setAppState((state) =>
       saveWorkoutPlan(
         state,
-        updateExercise(
-          normalizeWorkoutPlan(state.workoutPlan),
-          exerciseId,
-          patch,
-        ),
+        updateExercise(getActiveWorkoutPlan(state), exerciseId, patch),
       ),
     );
   };
@@ -1884,7 +1880,10 @@ function Home() {
     setAppState((state) =>
       saveWorkoutPlan(state, {
         ...getActiveWorkoutPlan(state),
-        name: name.trimStart(),
+        name:
+          name.trim().length === 0
+            ? getActiveWorkoutPlan(state).name
+            : name.trimStart(),
       }),
     );
   };
