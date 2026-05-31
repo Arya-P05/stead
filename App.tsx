@@ -1,5 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   AppState as NativeAppState,
@@ -846,23 +848,57 @@ function OnboardingSurface({
 
       <Animated.View key={step.id} style={[styles.onboardingStage, stageStyle]}>
         <View style={styles.onboardingHeroCard}>
-          <Animated.View style={[styles.onboardingGlowOne, glowStyle]} />
-          <Animated.View style={[styles.onboardingGlowTwo, glowStyle]} />
-          <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
-          <Text style={styles.onboardingMetric}>{metric}</Text>
-          <Text style={styles.onboardingHeroDetail}>{detail}</Text>
-          <View style={styles.onboardingRuler}>
-            {Array.from({ length: 25 }).map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.onboardingTick,
-                  index === 12 && styles.onboardingTickActive,
-                  index % 4 === 0 && styles.onboardingTickTall,
-                ]}
-              />
-            ))}
-          </View>
+          <LinearGradient
+            colors={["#eef4f7", "#f6f1ea", "#f8eee8"]}
+            locations={[0, 0.48, 1]}
+            start={{ x: 0.1, y: 0.02 }}
+            end={{ x: 0.95, y: 1 }}
+            style={styles.onboardingHeroBase}
+          />
+          <Animated.View style={[styles.onboardingAmbientLayer, glowStyle]}>
+            <LinearGradient
+              colors={[
+                "rgba(200,217,231,0.82)",
+                "rgba(216,210,223,0.42)",
+                "rgba(255,122,26,0.88)",
+              ]}
+              locations={[0, 0.48, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.onboardingAmbientGradient}
+            />
+          </Animated.View>
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={72}
+            style={styles.onboardingGlass}
+            tint="light"
+          >
+            <LinearGradient
+              colors={[
+                "rgba(255,255,255,0.52)",
+                "rgba(255,255,255,0.18)",
+                "rgba(255,255,255,0.42)",
+              ]}
+              locations={[0, 0.52, 1]}
+              style={styles.onboardingGlassWash}
+            />
+            <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
+            <Text style={styles.onboardingMetric}>{metric}</Text>
+            <Text style={styles.onboardingHeroDetail}>{detail}</Text>
+            <View style={styles.onboardingRuler}>
+              {Array.from({ length: 31 }).map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.onboardingTick,
+                    index === 15 && styles.onboardingTickActive,
+                    index % 5 === 0 && styles.onboardingTickTall,
+                  ]}
+                />
+              ))}
+            </View>
+          </BlurView>
         </View>
 
         <View style={styles.onboardingCopy}>
@@ -2418,7 +2454,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.screenTop,
   },
   onboardingContent: {
-    backgroundColor: "#f4f3ef",
+    backgroundColor: "#f2f1ed",
     flex: 1,
     paddingBottom: 34,
     paddingHorizontal: spacing.screenX,
@@ -2469,32 +2505,46 @@ const styles = StyleSheet.create({
   onboardingHeroCard: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "rgba(255,255,255,0.64)",
-    borderRadius: 34,
-    height: 350,
+    backgroundColor: "rgba(255,255,255,0.42)",
+    borderColor: "rgba(255,255,255,0.72)",
+    borderRadius: 38,
+    borderWidth: 1,
+    height: 360,
     justifyContent: "center",
     overflow: "hidden",
+    shadowColor: "#a8a5a0",
+    shadowOffset: { width: 0, height: 26 },
+    shadowOpacity: 0.24,
+    shadowRadius: 42,
     width: "100%",
   },
-  onboardingGlowOne: {
-    backgroundColor: "#ff7a1a",
-    borderRadius: 160,
-    height: 300,
-    opacity: 0.64,
-    position: "absolute",
-    right: -20,
-    top: 72,
-    width: 300,
+  onboardingHeroBase: {
+    ...StyleSheet.absoluteFillObject,
   },
-  onboardingGlowTwo: {
-    backgroundColor: "#c8d9e7",
-    borderRadius: 150,
-    height: 300,
-    left: -64,
-    opacity: 0.62,
+  onboardingAmbientLayer: {
+    bottom: -54,
+    height: 390,
+    left: -50,
     position: "absolute",
-    top: -38,
-    width: 300,
+    right: -50,
+  },
+  onboardingAmbientGradient: {
+    borderRadius: 190,
+    flex: 1,
+    transform: [{ rotate: "-10deg" }, { scaleX: 1.08 }],
+  },
+  onboardingGlass: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.48)",
+    borderRadius: 34,
+    borderWidth: 1,
+    height: "94%",
+    justifyContent: "center",
+    overflow: "hidden",
+    width: "94%",
+  },
+  onboardingGlassWash: {
+    ...StyleSheet.absoluteFillObject,
   },
   onboardingHeroLabel: {
     color: "#ffffff",
@@ -2507,12 +2557,15 @@ const styles = StyleSheet.create({
   onboardingMetric: {
     color: "#ffffff",
     fontFamily: typography.mono,
-    fontSize: 72,
+    fontSize: 80,
     fontWeight: "300",
     letterSpacing: 0,
-    lineHeight: 86,
-    marginTop: 48,
-    opacity: 0.94,
+    lineHeight: 92,
+    marginTop: 52,
+    opacity: 0.92,
+    textShadowColor: "rgba(255,255,255,0.24)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 14,
   },
   onboardingHeroDetail: {
     color: "#ffffff",
@@ -2523,19 +2576,19 @@ const styles = StyleSheet.create({
   },
   onboardingRuler: {
     alignItems: "flex-end",
-    bottom: 42,
+    bottom: 46,
     flexDirection: "row",
-    gap: 6,
+    gap: 5,
     height: 34,
     position: "absolute",
   },
   onboardingTick: {
-    backgroundColor: "rgba(255,255,255,0.42)",
-    height: 18,
+    backgroundColor: "rgba(255,255,255,0.34)",
+    height: 17,
     width: 2,
   },
   onboardingTickTall: {
-    height: 28,
+    height: 27,
   },
   onboardingTickActive: {
     backgroundColor: "#ffffff",
