@@ -39,6 +39,7 @@ import { chooseHomeMiddle } from "./src/domain/homeMiddle";
 import type { HomeMiddle } from "./src/domain/homeMiddle";
 import {
   addRestTime,
+  canFinishWorkoutSession,
   completeSet,
   getActiveExercise,
   getExerciseProgress,
@@ -1090,6 +1091,7 @@ function WorkoutSurface({
     (storedPlan) => storedPlan.archivedAt === null,
   );
   const parsedVoiceLog = parseWorkoutVoiceLog(voiceTranscript);
+  const canFinish = canFinishWorkoutSession(session);
 
   useEffect(() => {
     if (!visible) {
@@ -1486,7 +1488,7 @@ function WorkoutSurface({
                 <ActionText onPress={() => setMode("plan")}>
                   edit plan
                 </ActionText>
-                <ActionText onPress={onFinishWorkout}>
+                <ActionText disabled={!canFinish} onPress={onFinishWorkout}>
                   finish workout
                 </ActionText>
               </>
@@ -1822,6 +1824,10 @@ function Home() {
     });
   };
   const finishWorkout = () => {
+    if (!canFinishWorkoutSession(workoutSession)) {
+      return;
+    }
+
     const outcome = createWorkoutOutcome(workoutPlan, workoutSession);
     const linkedWorkoutItem = todayItems.find(
       (item) =>

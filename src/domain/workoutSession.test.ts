@@ -1,5 +1,6 @@
 import {
   addRestTime,
+  canFinishWorkoutSession,
   completeSet,
   getActiveExercise,
   getExerciseProgress,
@@ -72,6 +73,14 @@ describe("workout session", () => {
       reps: 8,
       weightLb: 55,
     });
+  });
+
+  it("only allows finishing once the workout has logged work", () => {
+    const empty = startWorkoutSession(plan, 1000);
+    const logged = completeSet(empty, plan, 1200);
+
+    expect(canFinishWorkoutSession(empty)).toBe(false);
+    expect(canFinishWorkoutSession(logged)).toBe(true);
   });
 
   it("reports exercise progress for the overview", () => {

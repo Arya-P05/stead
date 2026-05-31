@@ -180,3 +180,7 @@ export function addRestTime(
     restEndsAt: session.restEndsAt + seconds * 1000,
   };
 }
+
+export function canFinishWorkoutSession(session: WorkoutSession) {
+  return session.sets.length > 0 || session.completedAt !== null;
+}
