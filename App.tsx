@@ -1121,6 +1121,9 @@ function WorkoutSurface({
   const [mode, setMode] = useState<WorkoutMode>("overview");
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [planExerciseIndex, setPlanExerciseIndex] = useState(0);
+  const [plansReturnMode, setPlansReturnMode] = useState<WorkoutMode | null>(
+    null,
+  );
   const activeExercise = getActiveExercise(plan, session);
   const exerciseProgress = getExerciseProgress(plan, session);
   const restSeconds = getRestRemainingSeconds(session, now);
@@ -1149,6 +1152,7 @@ function WorkoutSurface({
     }
 
     setMode(initialMode);
+    setPlansReturnMode(null);
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
 
@@ -1502,18 +1506,27 @@ function WorkoutSurface({
                 <ActionText onPress={() => setMode("overview")}>
                   back
                 </ActionText>
-                <ActionText onPress={() => setMode("plans")}>
+                <ActionText
+                  onPress={() => {
+                    setPlansReturnMode("plan");
+                    setMode("plans");
+                  }}
+                >
                   workouts
                 </ActionText>
                 <ActionText onPress={onAddExercise}>add</ActionText>
               </>
             ) : mode === "plans" ? (
               <>
-                <ActionText onPress={() => setMode("plan")}>back</ActionText>
-                <ActionText onPress={onCreatePlan}>new</ActionText>
-                <ActionText onPress={() => onDuplicatePlan(activePlanId)}>
-                  copy
+                <ActionText
+                  onPress={() =>
+                    plansReturnMode ? setMode(plansReturnMode) : onBack()
+                  }
+                >
+                  back
                 </ActionText>
+                <ActionText onPress={() => setMode("plan")}>edit</ActionText>
+                <ActionText onPress={onCreatePlan}>new</ActionText>
                 <ActionText
                   disabled={activePlans.length <= 1}
                   tone="warning"
