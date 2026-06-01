@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AppState as NativeAppState,
   Modal,
@@ -1497,6 +1497,7 @@ function AddPlanSurface({
   const [sets, setSets] = useState("");
   const [reps, setReps] = useState("");
   const [savedPlanName, setSavedPlanName] = useState("push day");
+  const liftInputRef = useRef<TextInput>(null);
   const draft: AddPlanDraft = {
     createdVia: "write",
     kind: "strength",
@@ -1572,6 +1573,7 @@ function AddPlanSurface({
     setLiftName("");
     setSets("");
     setReps("");
+    requestAnimationFrame(() => liftInputRef.current?.focus());
   };
   const savePlan = () => {
     const now = Date.now();
@@ -1830,6 +1832,7 @@ function AddPlanSurface({
                     onSubmitEditing={addLift}
                     placeholder="lift"
                     placeholderTextColor="rgba(255,255,255,0.36)"
+                    ref={liftInputRef}
                     selectionColor={colors.success}
                     style={styles.addPlanLiftInput}
                     value={liftName}
