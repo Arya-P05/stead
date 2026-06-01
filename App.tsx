@@ -3611,9 +3611,9 @@ const styles = StyleSheet.create({
   },
   addPlanContent: {
     flex: 1,
-    paddingBottom: 34,
+    paddingBottom: 16,
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.screenTop,
+    paddingTop: 10,
   },
   addPlanBrand: {
     color: colors.foreground,
@@ -3722,8 +3722,9 @@ const styles = StyleSheet.create({
   },
   addPlanBuilder: {
     flex: 1,
-    justifyContent: "center",
-    paddingBottom: 72,
+    justifyContent: "flex-start",
+    paddingBottom: 12,
+    paddingTop: 16,
   },
   addPlanQuestion: {
     flex: 1,
@@ -3791,9 +3792,10 @@ const styles = StyleSheet.create({
     opacity: opacity.title,
   },
   addPlanLiftList: {
+    flexGrow: 1,
     gap: 20,
-    paddingBottom: 26,
-    paddingTop: 42,
+    paddingBottom: 18,
+    paddingTop: 20,
   },
   addPlanEmpty: {
     color: colors.foreground,
@@ -3821,7 +3823,7 @@ const styles = StyleSheet.create({
     gap: 22,
   },
   addPlanLiftInputWrap: {
-    borderBottomColor: "rgba(255,255,255,0.18)",
+    borderBottomColor: "rgba(255,255,255,0.26)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     flex: 1,
     paddingBottom: 10,
@@ -3831,11 +3833,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     letterSpacing: 0,
     lineHeight: 26,
-    opacity: opacity.body,
+    opacity: opacity.enabled,
     padding: 0,
   },
   addPlanNumberInputWrap: {
-    borderBottomColor: "rgba(255,255,255,0.18)",
+    borderBottomColor: "rgba(255,255,255,0.26)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingBottom: 10,
     width: 44,
@@ -3846,7 +3848,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     letterSpacing: 0,
     lineHeight: 26,
-    opacity: opacity.body,
+    opacity: opacity.enabled,
     padding: 0,
     textAlign: "center",
   },
