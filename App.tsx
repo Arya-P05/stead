@@ -18,7 +18,6 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -113,11 +112,6 @@ import {
   updateExercise,
 } from "./src/data/workoutPlan";
 import {
-  createWorkoutPlanFromPreset,
-  getWorkoutPresets,
-  type WorkoutPresetId,
-} from "./src/data/workoutPresets";
-import {
   applyWorkoutVoiceLog,
   parseWorkoutVoiceLog,
 } from "./src/domain/voiceLog";
@@ -188,34 +182,6 @@ type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
 type Surface = "home" | "calendar" | "day" | "plan" | "settings";
-type OnboardingStepId = "signal" | "workout" | "ready";
-
-const onboardingSteps: Array<{
-  id: OnboardingStepId;
-  index: string;
-  title: string;
-  body: string;
-}> = [
-  {
-    id: "signal",
-    index: "01",
-    title: "four months",
-    body: "a quiet operating system for the lock-in.",
-  },
-  {
-    id: "workout",
-    index: "02",
-    title: "choose a split",
-    body: "start simple. edit every lift later.",
-  },
-  {
-    id: "ready",
-    index: "03",
-    title: "today starts",
-    body: "the app opens to one signal, one next move.",
-  },
-];
-
 function parseWorkoutVisualKey(key: string): {
   mode: WorkoutMode;
   isResting: boolean;
@@ -779,188 +745,6 @@ function SettingsSurface({
         ) : null}
       </View>
     </View>
-  );
-}
-
-function OnboardingSurface({
-  onboardingState,
-  workoutPlan,
-  onFinish,
-  onPresetWorkout,
-}: {
-  onboardingState: OnboardingState;
-  workoutPlan: WorkoutPlan;
-  onFinish: () => void;
-  onPresetWorkout: (presetId: WorkoutPresetId) => void;
-}) {
-  const [stepIndex, setStepIndex] = useState(0);
-  const step = onboardingSteps[stepIndex];
-  const reveal = useSharedValue(0);
-  const stageStyle = useAnimatedStyle(() => ({
-    opacity: reveal.value,
-    transform: [{ translateY: (1 - reveal.value) * 10 }],
-  }));
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${((stepIndex + 1) / onboardingSteps.length) * 100}%`,
-  }));
-  const workoutReady = onboardingState.workoutPlanSetAt !== null;
-  const presets = getWorkoutPresets();
-  const metricLabel =
-    step.id === "signal"
-      ? "setup"
-      : step.id === "workout"
-        ? "workout"
-        : "ready";
-  const detail =
-    step.id === "signal"
-      ? "120 days · one day at a time"
-      : step.id === "workout"
-        ? `${workoutPlan.name} · ${formatWorkoutPlanMeta(workoutPlan)}`
-        : "walk · workout · record";
-
-  useEffect(() => {
-    reveal.value = 0;
-    reveal.value = withSpring(1, {
-      damping: 24,
-      stiffness: 170,
-      mass: 0.55,
-    });
-  }, [reveal, step.id]);
-
-  const goNext = () => {
-    if (step.id === "workout" && !workoutReady) {
-      onPresetWorkout("push");
-      return;
-    }
-
-    if (step.id === "ready") {
-      onFinish();
-      return;
-    }
-
-    setStepIndex((index) => Math.min(index + 1, onboardingSteps.length - 1));
-  };
-
-  return (
-    <View style={styles.onboardingContent}>
-      <View style={styles.onboardingTop}>
-        <Text style={styles.onboardingBrand}>stead</Text>
-        <Text style={styles.onboardingMeta}>
-          {step.index} of {String(onboardingSteps.length).padStart(2, "0")}
-        </Text>
-      </View>
-
-      <Animated.View key={step.id} style={[styles.onboardingStage, stageStyle]}>
-        <View style={styles.onboardingMiddle}>
-          <Text style={styles.onboardingHeroLabel}>{metricLabel}</Text>
-          <Text style={styles.onboardingTitle}>{step.title}</Text>
-          <Text style={styles.onboardingHeroDetail}>{detail}</Text>
-          <Text style={styles.onboardingBody}>{step.body}</Text>
-        </View>
-
-        {step.id === "workout" ? (
-          <View style={styles.onboardingPresetList}>
-            {presets.map((preset) => (
-              <PressableScale
-                key={preset.id}
-                onPress={() => onPresetWorkout(preset.id)}
-                scaleTo={0.98}
-                style={styles.onboardingPresetPill}
-              >
-                <Text
-                  style={[
-                    styles.onboardingPresetText,
-                    workoutPlan.name === preset.name &&
-                      styles.onboardingPresetTextActive,
-                  ]}
-                >
-                  {preset.name}
-                </Text>
-              </PressableScale>
-            ))}
-          </View>
-        ) : null}
-
-        <View style={styles.onboardingDots}>
-          {onboardingSteps.map((item, index) => (
-            <View
-              key={item.id}
-              style={[
-                styles.onboardingDot,
-                index === stepIndex && styles.onboardingDotActive,
-              ]}
-            />
-          ))}
-        </View>
-      </Animated.View>
-
-      <View style={styles.onboardingProgressTrack}>
-        <Animated.View style={[styles.onboardingProgressFill, progressStyle]} />
-      </View>
-
-      <View style={styles.onboardingActions}>
-        <OnboardingAction
-          disabled={stepIndex === 0}
-          label="back"
-          onPress={() => setStepIndex((index) => Math.max(index - 1, 0))}
-        />
-        <OnboardingAction
-          label={
-            step.id === "workout" && !workoutReady
-              ? "use push"
-              : step.id === "ready"
-                ? "enter stead"
-                : "continue"
-          }
-          primary
-          onPress={goNext}
-        />
-      </View>
-    </View>
-  );
-}
-
-function OnboardingAction({
-  disabled,
-  label,
-  primary,
-  onPress,
-}: {
-  disabled?: boolean;
-  label: string;
-  primary?: boolean;
-  onPress: () => void;
-}) {
-  const press = async () => {
-    if (disabled) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
-    }
-
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
-  return (
-    <PressableScale
-      disabled={disabled}
-      onPress={press}
-      scaleTo={0.98}
-      style={[
-        styles.onboardingAction,
-        primary && styles.onboardingActionPrimary,
-        disabled && styles.onboardingActionDisabled,
-      ]}
-    >
-      <Text
-        style={[
-          styles.onboardingActionText,
-          primary && styles.onboardingActionTextPrimary,
-        ]}
-      >
-        {label}
-      </Text>
-    </PressableScale>
   );
 }
 
@@ -1588,24 +1372,128 @@ function WorkoutSurface({
 
 type AddPlanScreen =
   | "start"
+  | "describe-goal"
+  | "describe-days"
+  | "describe-equipment"
+  | "drafting"
+  | "snap-pick"
+  | "reading"
   | "write-name"
   | "write-build"
   | "review"
+  | "day-detail"
   | "saved";
 
+type AddPlanLiftDraft = {
+  name: string;
+  reps: number;
+  sets: number;
+};
+
+type AddPlanDayDraft = {
+  index: string;
+  lifts: AddPlanLiftDraft[];
+  name: string;
+};
+
+type AddPlanReviewDraft =
+  | {
+      createdVia: "snap" | "write";
+      days?: undefined;
+      kind: "strength" | "muscle" | "general health" | "endurance";
+      lifts: AddPlanLiftDraft[];
+      multi: false;
+      name: string;
+    }
+  | {
+      createdVia: "describe";
+      days: AddPlanDayDraft[];
+      kind: "strength" | "muscle" | "general health" | "endurance";
+      lifts?: undefined;
+      multi: true;
+      name: string;
+    };
+
+const describedSplit: AddPlanReviewDraft = {
+  createdVia: "describe",
+  kind: "strength",
+  multi: true,
+  name: "push · pull · legs · upper",
+  days: [
+    {
+      index: "01",
+      name: "push",
+      lifts: [
+        { name: "bench press", sets: 4, reps: 8 },
+        { name: "incline db press", sets: 4, reps: 10 },
+        { name: "cable fly", sets: 3, reps: 12 },
+        { name: "tricep pushdown", sets: 3, reps: 15 },
+        { name: "lateral raise", sets: 3, reps: 12 },
+      ],
+    },
+    {
+      index: "02",
+      name: "pull",
+      lifts: [
+        { name: "deadlift", sets: 3, reps: 5 },
+        { name: "pull-up", sets: 4, reps: 8 },
+        { name: "barbell row", sets: 4, reps: 10 },
+        { name: "face pull", sets: 3, reps: 15 },
+        { name: "db curl", sets: 3, reps: 12 },
+      ],
+    },
+    {
+      index: "03",
+      name: "legs",
+      lifts: [
+        { name: "back squat", sets: 4, reps: 6 },
+        { name: "romanian deadlift", sets: 3, reps: 10 },
+        { name: "leg press", sets: 3, reps: 12 },
+        { name: "leg curl", sets: 3, reps: 15 },
+        { name: "calf raise", sets: 4, reps: 15 },
+      ],
+    },
+    {
+      index: "04",
+      name: "upper",
+      lifts: [
+        { name: "overhead press", sets: 4, reps: 8 },
+        { name: "incline bench", sets: 3, reps: 10 },
+        { name: "lat pulldown", sets: 4, reps: 10 },
+        { name: "lateral raise", sets: 3, reps: 15 },
+        { name: "hammer curl", sets: 3, reps: 12 },
+      ],
+    },
+  ],
+};
+
+const snapPlan: AddPlanReviewDraft = {
+  createdVia: "snap",
+  kind: "strength",
+  multi: false,
+  name: "push day",
+  lifts: describedSplit.days[0].lifts,
+};
+
 function AddPlanSurface({
+  embedded = false,
   visible,
   onBack,
-  onSavePlan,
+  onSavePlans,
 }: {
+  embedded?: boolean;
   visible: boolean;
   onBack: () => void;
-  onSavePlan: (plan: WorkoutPlan) => void;
+  onSavePlans: (plans: WorkoutPlan[]) => void;
 }) {
   const [screen, setScreen] = useState<AddPlanScreen>("start");
   const [planName, setPlanName] = useState("push day");
-  const [lifts, setLifts] = useState<AddPlanLift[]>([]);
+  const [lifts, setLifts] = useState<AddPlanLiftDraft[]>([]);
   const [liftName, setLiftName] = useState("");
+  const [reviewDraft, setReviewDraft] =
+    useState<AddPlanReviewDraft>(describedSplit);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [snapPicked, setSnapPicked] = useState(false);
   const [sets, setSets] = useState("3");
   const [reps, setReps] = useState("10");
   const [savedPlanName, setSavedPlanName] = useState("push day");
@@ -1617,7 +1505,6 @@ function AddPlanSurface({
   };
   const canAddLift = liftName.trim().length > 0;
   const canReview = canSaveAddPlanDraft(draft);
-
   useEffect(() => {
     if (!visible) {
       return;
@@ -1627,6 +1514,9 @@ function AddPlanSurface({
     setPlanName("push day");
     setLifts([]);
     setLiftName("");
+    setReviewDraft(describedSplit);
+    setSelectedDayIndex(0);
+    setSnapPicked(false);
     setSets("3");
     setReps("10");
   }, [visible]);
@@ -1636,6 +1526,9 @@ function AddPlanSurface({
     setPlanName("push day");
     setLifts([]);
     setLiftName("");
+    setReviewDraft(describedSplit);
+    setSelectedDayIndex(0);
+    setSnapPicked(false);
     setSets("3");
     setReps("10");
   };
@@ -1649,8 +1542,16 @@ function AddPlanSurface({
       setScreen("start");
     } else if (screen === "write-build") {
       setScreen("write-name");
+    } else if (screen === "describe-goal" || screen === "snap-pick") {
+      setScreen("start");
+    } else if (screen === "describe-days") {
+      setScreen("describe-goal");
+    } else if (screen === "describe-equipment") {
+      setScreen("describe-days");
     } else if (screen === "review") {
-      setScreen("write-build");
+      setScreen(reviewDraft.createdVia === "write" ? "write-build" : "start");
+    } else if (screen === "day-detail") {
+      setScreen("review");
     } else {
       onBack();
     }
@@ -1663,7 +1564,7 @@ function AddPlanSurface({
     setLifts((current) => [
       ...current,
       {
-        name: liftName,
+        name: liftName.trim().toLowerCase(),
         reps: parsePlanNumber(reps, 1) ?? 10,
         sets: parsePlanNumber(sets, 1) ?? 3,
       },
@@ -1674,12 +1575,417 @@ function AddPlanSurface({
   };
   const savePlan = () => {
     const now = Date.now();
-    const plan = createWorkoutPlanFromAddPlanDraft(draft, now);
+    const plans = createWorkoutPlansFromReviewDraft(reviewDraft, now);
 
-    setSavedPlanName(plan.name);
-    onSavePlan(plan);
+    setSavedPlanName(reviewDraft.name);
+    onSavePlans(plans);
     setScreen("saved");
   };
+  const goReview = (nextDraft: AddPlanReviewDraft) => {
+    setReviewDraft(nextDraft);
+    setScreen("review");
+  };
+  const startThinking = (kind: "drafting" | "reading") => {
+    setScreen(kind);
+    setTimeout(() => {
+      goReview(kind === "drafting" ? describedSplit : snapPlan);
+    }, 2700);
+  };
+  const saveWriteDraft = () => {
+    if (!canReview) {
+      return;
+    }
+
+    goReview({
+      createdVia: "write",
+      kind: "strength",
+      lifts,
+      multi: false,
+      name: planName.trim() || "push day",
+    });
+  };
+
+  const content = (
+    <SafeAreaView style={styles.screen}>
+      <StatusBar style="light" />
+      <Animated.View
+        key={screen}
+        entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))}
+        style={styles.addPlanContent}
+      >
+        {screen === "start" ? (
+          <>
+            <AddPlanTopBar label="stead" />
+            <View style={styles.addPlanCenter}>
+              <View style={styles.addPlanIntro}>
+                <Text style={styles.addPlanBody}>
+                  you don't have a plan yet.
+                </Text>
+                <Text style={styles.addPlanBody}>let's build one.</Text>
+              </View>
+              <Text style={styles.metadataText}>how do you want to start?</Text>
+              <View style={styles.addPlanPickList}>
+                <AddPlanPickRow
+                  index="01"
+                  label="describe"
+                  note="answer a few"
+                  onPress={() => setScreen("describe-goal")}
+                />
+                <AddPlanPickRow
+                  index="02"
+                  label="snap"
+                  note="from a photo"
+                  onPress={() => setScreen("snap-pick")}
+                />
+                <AddPlanPickRow
+                  index="03"
+                  label="write"
+                  note="by hand"
+                  onPress={() => setScreen("write-name")}
+                />
+              </View>
+            </View>
+            <Text style={styles.addPlanFooter}>
+              stead structures it · you log the rest live
+            </Text>
+          </>
+        ) : screen === "describe-goal" ? (
+          <AddPlanQuestion
+            label="01 of 03"
+            onBack={goBack}
+            options={[
+              ["strength", "lift heavier"],
+              ["muscle", "build size"],
+              ["general health", "stay strong"],
+              ["endurance", "go longer"],
+            ]}
+            prompt="what are you training for?"
+            onChoose={() => setScreen("describe-days")}
+          />
+        ) : screen === "describe-days" ? (
+          <AddPlanQuestion
+            label="02 of 03"
+            onBack={goBack}
+            options={[
+              ["3 days", "full body"],
+              ["4 days", "upper / lower split"],
+              ["5 days", "push pull legs +"],
+              ["6 days", "high volume"],
+            ]}
+            prompt="how many days a week?"
+            onChoose={() => setScreen("describe-equipment")}
+          />
+        ) : screen === "describe-equipment" ? (
+          <AddPlanQuestion
+            label="03 of 03"
+            onBack={goBack}
+            options={[
+              ["full gym", "everything"],
+              ["dumbbells", "at home"],
+              ["bodyweight", "no equipment"],
+            ]}
+            prompt="what do you train with?"
+            onChoose={() => startThinking("drafting")}
+          />
+        ) : screen === "drafting" || screen === "reading" ? (
+          <AddPlanThinking
+            label={
+              screen === "drafting"
+                ? "drafting your plan"
+                : "reading your photo"
+            }
+            lines={
+              screen === "drafting"
+                ? [
+                    "reading what you told me",
+                    "choosing a 4-day split",
+                    "balancing push and pull",
+                    "setting starting volume",
+                  ]
+                : [
+                    "scanning the image",
+                    "finding your lifts",
+                    "structuring sets and reps",
+                    "matching to stead",
+                  ]
+            }
+          />
+        ) : screen === "snap-pick" ? (
+          <>
+            <AddPlanTopBar onBack={goBack} label="snap" />
+            <View style={styles.addPlanBuilder}>
+              <Text style={styles.metadataText}>
+                {snapPicked
+                  ? "got it — here is what you sent"
+                  : "add a screenshot of your current plan"}
+              </Text>
+              <PressableScale
+                onPress={() => setSnapPicked(true)}
+                style={[
+                  styles.addPlanPhotoDrop,
+                  snapPicked && styles.addPlanPhotoAttached,
+                ]}
+              >
+                {snapPicked ? (
+                  <View style={styles.addPlanMockPhoto}>
+                    <Text style={styles.addPlanMockTitle}>PPL — current</Text>
+                    <Text style={styles.addPlanMockLine}>push</Text>
+                    <Text style={styles.addPlanMockLine}>bench 4x8</Text>
+                    <Text style={styles.addPlanMockLine}>incline db 4x10</Text>
+                    <Text style={styles.addPlanMockLine}>pull</Text>
+                    <Text style={styles.addPlanMockLine}>deadlift 3x5</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.addPlanPlus}>+</Text>
+                    <Text style={styles.metadataText}>tap to add a photo</Text>
+                    <Text style={styles.addPlanHint}>
+                      notes · sheets · another app
+                    </Text>
+                  </>
+                )}
+              </PressableScale>
+            </View>
+            <View style={styles.bottomActions}>
+              <ActionText
+                onPress={() =>
+                  snapPicked ? setSnapPicked(false) : setScreen("start")
+                }
+              >
+                {snapPicked ? "retake" : "cancel"}
+              </ActionText>
+              <ActionText
+                disabled={!snapPicked}
+                onPress={() => startThinking("reading")}
+              >
+                read it
+              </ActionText>
+            </View>
+          </>
+        ) : screen === "write-name" ? (
+          <>
+            <AddPlanTopBar onBack={goBack} label="write" />
+            <View style={styles.addPlanCenter}>
+              <Text style={styles.metadataText}>name this day</Text>
+              <TextInput
+                autoFocus
+                onChangeText={setPlanName}
+                onSubmitEditing={() => setScreen("write-build")}
+                placeholder="push day"
+                placeholderTextColor="rgba(255,255,255,0.22)"
+                selectionColor={colors.success}
+                style={styles.addPlanNameInput}
+                value={planName}
+              />
+              <Text style={styles.addPlanHint}>
+                e.g. push day · legs · upper a
+              </Text>
+            </View>
+            <View style={styles.bottomActions}>
+              <ActionText onPress={goBack}>back</ActionText>
+              <ActionText
+                onPress={() => {
+                  if (planName.trim().length === 0) {
+                    setPlanName("push day");
+                  }
+                  setScreen("write-build");
+                }}
+              >
+                next
+              </ActionText>
+            </View>
+          </>
+        ) : screen === "write-build" ? (
+          <>
+            <AddPlanTopBar
+              onBack={goBack}
+              label={`${lifts.length} ${lifts.length === 1 ? "lift" : "lifts"}`}
+            />
+            <View style={styles.addPlanBuilder}>
+              <Text style={styles.addPlanPageTitle}>
+                {planName.trim() || "push day"}
+              </Text>
+              <ScrollView
+                contentContainerStyle={styles.addPlanLiftList}
+                keyboardShouldPersistTaps="handled"
+              >
+                {lifts.length === 0 ? (
+                  <Text style={styles.addPlanEmpty}>
+                    add lifts below — type or say them
+                  </Text>
+                ) : (
+                  lifts.map((lift, index) => (
+                    <AddPlanLiftRow
+                      key={`${lift.name}-${index}`}
+                      index={String(index + 1).padStart(2, "0")}
+                      lift={lift}
+                    />
+                  ))
+                )}
+              </ScrollView>
+              <View style={styles.addPlanInlineRow}>
+                <TextInput
+                  onChangeText={setLiftName}
+                  onSubmitEditing={addLift}
+                  placeholder="lift"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  selectionColor={colors.success}
+                  style={styles.addPlanLiftInput}
+                  value={liftName}
+                />
+                <TextInput
+                  keyboardType="number-pad"
+                  onChangeText={(value) =>
+                    setSets(value.replace(/[^0-9]/g, ""))
+                  }
+                  placeholder="3"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  selectionColor={colors.success}
+                  style={styles.addPlanNumberInput}
+                  value={sets}
+                />
+                <Text style={styles.addPlanMultiply}>×</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  onChangeText={(value) =>
+                    setReps(value.replace(/[^0-9]/g, ""))
+                  }
+                  placeholder="10"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  selectionColor={colors.success}
+                  style={styles.addPlanNumberInput}
+                  value={reps}
+                />
+              </View>
+            </View>
+            <View style={styles.bottomActions}>
+              <ActionText
+                onPress={() => {
+                  setLiftName("incline db press");
+                  setSets("3");
+                  setReps("10");
+                }}
+              >
+                voice
+              </ActionText>
+              <ActionText disabled={!canAddLift} onPress={addLift}>
+                add
+              </ActionText>
+              <ActionText disabled={!canReview} onPress={saveWriteDraft}>
+                review
+              </ActionText>
+            </View>
+          </>
+        ) : screen === "review" ? (
+          <>
+            <AddPlanTopBar onBack={goBack} label="review" />
+            <View style={styles.addPlanBuilder}>
+              <Text style={styles.metadataText}>your plan</Text>
+              <Text style={styles.addPlanPageTitle}>{reviewDraft.name}</Text>
+              <Text style={styles.monoMeta}>
+                {reviewDraft.multi
+                  ? `${reviewDraft.kind} · ${reviewDraft.days.length} days · ${reviewDraft.days.reduce((sum, day) => sum + day.lifts.length, 0)} lifts`
+                  : `${reviewDraft.kind} · ${reviewDraft.lifts.length} lifts · ~${Math.max(20, reviewDraft.lifts.length * 9)} min`}
+              </Text>
+              <View style={styles.addPlanReviewList}>
+                {reviewDraft.multi
+                  ? reviewDraft.days.map((day, index) => (
+                      <PressableScale
+                        key={day.index}
+                        onPress={() => {
+                          setSelectedDayIndex(index);
+                          setScreen("day-detail");
+                        }}
+                        style={styles.addPlanLiftRow}
+                      >
+                        <IndexText>{day.index}</IndexText>
+                        <Text style={styles.addPlanLiftName}>{day.name}</Text>
+                        <Text style={styles.monoMeta}>
+                          {day.lifts.length} lifts
+                        </Text>
+                      </PressableScale>
+                    ))
+                  : reviewDraft.lifts.map((lift, index) => (
+                      <AddPlanLiftRow
+                        key={`${lift.name}-${index}`}
+                        index={String(index + 1).padStart(2, "0")}
+                        lift={lift}
+                      />
+                    ))}
+              </View>
+            </View>
+            <View style={styles.bottomActions}>
+              <ActionText
+                onPress={() =>
+                  reviewDraft.multi
+                    ? setScreen("describe-goal")
+                    : setScreen("write-build")
+                }
+              >
+                {reviewDraft.multi ? "add a day" : "add lift"}
+              </ActionText>
+              <ActionText disabled={!reviewDraft} onPress={savePlan}>
+                save plan
+              </ActionText>
+            </View>
+          </>
+        ) : screen === "day-detail" && reviewDraft.multi ? (
+          <>
+            <AddPlanTopBar
+              onBack={goBack}
+              label={`day ${reviewDraft.days[selectedDayIndex]?.index ?? "01"}`}
+            />
+            <View style={styles.addPlanBuilder}>
+              <Text style={styles.addPlanPageTitle}>
+                {reviewDraft.days[selectedDayIndex]?.name ?? "push"}
+              </Text>
+              <Text style={styles.monoMeta}>
+                {reviewDraft.days[selectedDayIndex]?.lifts.length ?? 0} lifts
+              </Text>
+              <View style={styles.addPlanReviewList}>
+                {(reviewDraft.days[selectedDayIndex]?.lifts ?? []).map(
+                  (lift, index) => (
+                    <AddPlanLiftRow
+                      key={`${lift.name}-${index}`}
+                      index={String(index + 1).padStart(2, "0")}
+                      lift={lift}
+                    />
+                  ),
+                )}
+              </View>
+            </View>
+            <View style={styles.bottomActions}>
+              <ActionText onPress={() => setScreen("review")}>back</ActionText>
+              <ActionText onPress={() => setScreen("review")}>
+                back to plan
+              </ActionText>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.addPlanSaved}>
+              <View style={styles.addPlanSuccessLine} />
+              <Text style={styles.addPlanSavedText}>saved</Text>
+              <Text style={styles.addPlanPageTitle}>{savedPlanName}</Text>
+              <Text style={styles.addPlanSavedBody}>
+                {reviewDraft.multi
+                  ? "it's in your schedule. push is up first — tomorrow at 6:30."
+                  : "it's in your schedule, ready when you are. tomorrow at 6:30."}
+              </Text>
+            </View>
+            <View style={styles.bottomActions}>
+              <ActionText onPress={resetDraft}>add another</ActionText>
+              <ActionText onPress={onBack}>view schedule</ActionText>
+            </View>
+          </>
+        )}
+      </Animated.View>
+    </SafeAreaView>
+  );
+
+  if (embedded) {
+    return content;
+  }
 
   return (
     <Modal
@@ -1687,231 +1993,126 @@ function AddPlanSurface({
       presentationStyle="fullScreen"
       visible={visible}
     >
-      <SafeAreaView style={styles.screen}>
-        <StatusBar style="light" />
-        <Animated.View
-          key={screen}
-          entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))}
-          style={styles.addPlanContent}
-        >
-          {screen === "start" ? (
-            <>
-              <Text style={styles.addPlanBrand}>stead</Text>
-              <View style={styles.addPlanCenter}>
-                <View style={styles.addPlanIntro}>
-                  <Text style={styles.addPlanTitle}>
-                    you don't have a plan yet.
-                  </Text>
-                  <Text style={styles.addPlanTitle}>let's build one.</Text>
-                </View>
-                <Text style={styles.metadataText}>
-                  how do you want to start?
-                </Text>
-                <View style={styles.addPlanPickList}>
-                  <AddPlanPickRow
-                    index="01"
-                    label="describe"
-                    note="answer a few"
-                    onPress={() => setScreen("write-name")}
-                  />
-                  <AddPlanPickRow
-                    index="02"
-                    label="snap"
-                    note="from a photo"
-                    onPress={() => setScreen("write-name")}
-                  />
-                  <AddPlanPickRow
-                    index="03"
-                    label="write"
-                    note="by hand"
-                    onPress={() => setScreen("write-name")}
-                  />
-                </View>
-              </View>
-              <Text style={styles.addPlanFooter}>
-                stead structures it · you log the rest live
-              </Text>
-            </>
-          ) : screen === "write-name" ? (
-            <>
-              <AddPlanTopBar onBack={goBack} label="write" />
-              <View style={styles.addPlanCenter}>
-                <Text style={styles.metadataText}>name this day</Text>
-                <TextInput
-                  autoFocus
-                  onChangeText={setPlanName}
-                  onSubmitEditing={() => setScreen("write-build")}
-                  placeholder="push day"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  selectionColor={colors.success}
-                  style={styles.addPlanNameInput}
-                  value={planName}
-                />
-                <Text style={styles.addPlanHint}>
-                  e.g. push day · legs · upper a
-                </Text>
-              </View>
-              <View style={styles.bottomActions}>
-                <ActionText onPress={goBack}>back</ActionText>
-                <ActionText
-                  onPress={() => {
-                    if (planName.trim().length === 0) {
-                      setPlanName("push day");
-                    }
-                    setScreen("write-build");
-                  }}
-                >
-                  next
-                </ActionText>
-              </View>
-            </>
-          ) : screen === "write-build" ? (
-            <>
-              <AddPlanTopBar
-                onBack={goBack}
-                label={`${lifts.length} ${lifts.length === 1 ? "lift" : "lifts"}`}
-              />
-              <View style={styles.addPlanBuilder}>
-                <Text style={styles.addPlanPageTitle}>
-                  {planName.trim() || "push day"}
-                </Text>
-                <ScrollView
-                  contentContainerStyle={styles.addPlanLiftList}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {lifts.length === 0 ? (
-                    <Text style={styles.addPlanEmpty}>
-                      add lifts below — type or say them
-                    </Text>
-                  ) : (
-                    lifts.map((lift, index) => (
-                      <View
-                        key={`${lift.name}-${index}`}
-                        style={styles.addPlanLiftRow}
-                      >
-                        <IndexText active>
-                          {String(index + 1).padStart(2, "0")}
-                        </IndexText>
-                        <Text style={styles.addPlanLiftName}>{lift.name}</Text>
-                        <Text style={styles.monoMeta}>
-                          {lift.sets ?? 3} × {lift.reps ?? 10}
-                        </Text>
-                      </View>
-                    ))
-                  )}
-                </ScrollView>
-                <View style={styles.addPlanInlineRow}>
-                  <TextInput
-                    onChangeText={setLiftName}
-                    onSubmitEditing={addLift}
-                    placeholder="lift"
-                    placeholderTextColor="rgba(255,255,255,0.22)"
-                    selectionColor={colors.success}
-                    style={styles.addPlanLiftInput}
-                    value={liftName}
-                  />
-                  <TextInput
-                    keyboardType="number-pad"
-                    onChangeText={(value) =>
-                      setSets(value.replace(/[^0-9]/g, ""))
-                    }
-                    placeholder="3"
-                    placeholderTextColor="rgba(255,255,255,0.22)"
-                    selectionColor={colors.success}
-                    style={styles.addPlanNumberInput}
-                    value={sets}
-                  />
-                  <Text style={styles.addPlanMultiply}>×</Text>
-                  <TextInput
-                    keyboardType="number-pad"
-                    onChangeText={(value) =>
-                      setReps(value.replace(/[^0-9]/g, ""))
-                    }
-                    placeholder="10"
-                    placeholderTextColor="rgba(255,255,255,0.22)"
-                    selectionColor={colors.success}
-                    style={styles.addPlanNumberInput}
-                    value={reps}
-                  />
-                </View>
-              </View>
-              <View style={styles.bottomActions}>
-                <ActionText
-                  onPress={() => {
-                    setLiftName("incline db press");
-                    setSets("3");
-                    setReps("10");
-                  }}
-                >
-                  voice
-                </ActionText>
-                <ActionText disabled={!canAddLift} onPress={addLift}>
-                  add
-                </ActionText>
-                <ActionText
-                  disabled={!canReview}
-                  onPress={() => setScreen("review")}
-                >
-                  review
-                </ActionText>
-              </View>
-            </>
-          ) : screen === "review" ? (
-            <>
-              <AddPlanTopBar onBack={goBack} label="your plan" />
-              <View style={styles.addPlanBuilder}>
-                <Text style={styles.addPlanPageTitle}>
-                  {planName.trim() || "push day"}
-                </Text>
-                <Text style={styles.monoMeta}>
-                  strength · {lifts.length} lifts · ~
-                  {Math.max(20, lifts.length * 9)} min
-                </Text>
-                <View style={styles.addPlanReviewList}>
-                  {lifts.map((lift, index) => (
-                    <View
-                      key={`${lift.name}-${index}`}
-                      style={styles.addPlanLiftRow}
-                    >
-                      <IndexText>
-                        {String(index + 1).padStart(2, "0")}
-                      </IndexText>
-                      <Text style={styles.addPlanLiftName}>{lift.name}</Text>
-                      <Text style={styles.monoMeta}>
-                        {lift.sets ?? 3} × {lift.reps ?? 10}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.bottomActions}>
-                <ActionText onPress={() => setScreen("write-build")}>
-                  add lift
-                </ActionText>
-                <ActionText disabled={!canReview} onPress={savePlan}>
-                  save plan
-                </ActionText>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.addPlanSaved}>
-                <View style={styles.addPlanSuccessLine} />
-                <Text style={styles.addPlanSavedText}>saved</Text>
-                <Text style={styles.addPlanPageTitle}>{savedPlanName}</Text>
-                <Text style={styles.addPlanSavedBody}>
-                  it's in your schedule, ready when you are.
-                </Text>
-              </View>
-              <View style={styles.bottomActions}>
-                <ActionText onPress={resetDraft}>add another</ActionText>
-                <ActionText onPress={onBack}>view schedule</ActionText>
-              </View>
-            </>
-          )}
-        </Animated.View>
-      </SafeAreaView>
+      {content}
     </Modal>
+  );
+}
+
+function createWorkoutPlansFromReviewDraft(
+  draft: AddPlanReviewDraft,
+  now: number,
+): WorkoutPlan[] {
+  if (!draft.multi) {
+    return [
+      createWorkoutPlanFromAddPlanDraft(
+        {
+          createdVia: draft.createdVia,
+          kind: draft.kind,
+          lifts: draft.lifts,
+          name: draft.name,
+        },
+        now,
+      ),
+    ];
+  }
+
+  return draft.days.map((day, index) =>
+    createWorkoutPlanFromAddPlanDraft(
+      {
+        createdVia: "describe",
+        kind: draft.kind,
+        lifts: day.lifts,
+        name: day.name,
+      },
+      now + index,
+    ),
+  );
+}
+
+function AddPlanQuestion({
+  label,
+  onBack,
+  onChoose,
+  options,
+  prompt,
+}: {
+  label: string;
+  onBack: () => void;
+  onChoose: () => void;
+  options: Array<[string, string]>;
+  prompt: string;
+}) {
+  return (
+    <>
+      <AddPlanTopBar onBack={onBack} label={label} />
+      <View style={styles.addPlanQuestion}>
+        <Text style={styles.addPlanQuestionTitle}>{prompt}</Text>
+        <View style={styles.addPlanQuestionList}>
+          {options.map(([option, note], index) => (
+            <AddPlanPickRow
+              key={option}
+              index={String(index + 1).padStart(2, "0")}
+              label={option}
+              note={note}
+              onPress={onChoose}
+            />
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}
+
+function AddPlanThinking({ label, lines }: { label: string; lines: string[] }) {
+  const [lineIndex, setLineIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(
+      () => setLineIndex((index) => Math.min(index + 1, lines.length - 1)),
+      650,
+    );
+
+    return () => clearInterval(timer);
+  }, [lines.length]);
+
+  return (
+    <>
+      <AddPlanTopBar label="stead" />
+      <View style={styles.addPlanThinking}>
+        <PulsingDot style={styles.addPlanThinkingDot} />
+        <Text style={styles.metadataText}>{label}</Text>
+        <Text style={styles.addPlanThinkingLine}>{lines[lineIndex]}</Text>
+      </View>
+      <View style={styles.addPlanTicks}>
+        {lines.map((line, index) => (
+          <View
+            key={line}
+            style={[
+              styles.addPlanTick,
+              index <= lineIndex && styles.addPlanTickActive,
+            ]}
+          />
+        ))}
+      </View>
+    </>
+  );
+}
+
+function AddPlanLiftRow({
+  index,
+  lift,
+}: {
+  index: string;
+  lift: AddPlanLiftDraft;
+}) {
+  return (
+    <View style={styles.addPlanLiftRow}>
+      <IndexText>{index}</IndexText>
+      <Text style={styles.addPlanLiftName}>{lift.name}</Text>
+      <Text style={styles.monoMeta}>
+        {lift.sets} × {lift.reps}
+      </Text>
+    </View>
   );
 }
 
@@ -1920,13 +2121,17 @@ function AddPlanTopBar({
   onBack,
 }: {
   label: string;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   return (
     <View style={styles.addPlanTopBar}>
-      <PressableScale onPress={onBack} hitSlop={12}>
-        <Text style={styles.addPlanBack}>‹</Text>
-      </PressableScale>
+      {onBack ? (
+        <PressableScale onPress={onBack} hitSlop={12}>
+          <Text style={styles.addPlanBack}>‹</Text>
+        </PressableScale>
+      ) : (
+        <Text style={styles.addPlanBrand}>stead</Text>
+      )}
       <Text style={styles.monoMeta}>{label}</Text>
     </View>
   );
@@ -1947,7 +2152,7 @@ function AddPlanPickRow({
     <PressableScale onPress={onPress} style={styles.addPlanPickRow}>
       <IndexText>{index}</IndexText>
       <Text style={styles.addPlanPickLabel}>{label}</Text>
-      <Text style={styles.monoMeta}>— {note}</Text>
+      <Text style={styles.addPlanPickNote}>{note}</Text>
     </PressableScale>
   );
 }
@@ -2378,28 +2583,31 @@ function Home() {
   const createWorkoutPlan = () => {
     setAddPlanVisible(true);
   };
-  const saveAddedWorkoutPlan = (plan: WorkoutPlan) => {
+  const saveAddedWorkoutPlans = (plans: WorkoutPlan[]) => {
     const createdAt = Date.now();
+    const firstPlan = plans[0];
 
-    setAppState((state) => addWorkoutPlan(state, plan, createdAt));
-    setWorkoutSession(startWorkoutSession(plan, createdAt));
-    setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
-    setWorkoutVisible(false);
-  };
-  const choosePresetWorkoutPlan = (presetId: WorkoutPresetId) => {
-    const createdAt = Date.now();
-    const plan = createWorkoutPlanFromPreset(presetId, createdAt);
+    if (!firstPlan) {
+      return;
+    }
 
     setAppState((state) =>
-      seedDailyPlanForWorkout(
-        addWorkoutPlan(state, plan, createdAt),
-        today.date,
-        plan,
-        createdAt,
-      ),
+      [...plans]
+        .reverse()
+        .reduce(
+          (nextState, plan, index) =>
+            seedDailyPlanForWorkout(
+              addWorkoutPlan(nextState, plan, createdAt + index),
+              today.date,
+              plan,
+              createdAt + index,
+            ),
+          state,
+        ),
     );
-    setWorkoutSession(startWorkoutSession(plan, createdAt));
+    setWorkoutSession(startWorkoutSession(firstPlan, createdAt));
     setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
+    setWorkoutVisible(false);
   };
   const selectWorkoutPlan = (planId: string) => {
     const plan = appState.workoutPlans.find(
@@ -2488,65 +2696,13 @@ function Home() {
 
   if (onboardingState.completedAt === null) {
     return (
-      <SafeAreaView style={styles.onboardingScreen}>
-        <StatusBar style="light" />
-        <OnboardingSurface
-          key={onboardingReplayKey}
-          onboardingState={onboardingState}
-          workoutPlan={workoutPlan}
-          onFinish={finishOnboarding}
-          onPresetWorkout={choosePresetWorkoutPlan}
-        />
-        <WorkoutSurface
-          activePlanId={appState.activeWorkoutPlanId}
-          initialMode={workoutInitialMode}
-          plan={workoutPlan}
-          plans={appState.workoutPlans}
-          session={workoutSession}
-          visible={workoutVisible}
-          onAddRest={() =>
-            setWorkoutSession((session) => {
-              const nextSession = addRestTime(session, 30);
-
-              setAppState((state) =>
-                saveActiveWorkoutSession(state, nextSession),
-              );
-
-              return nextSession;
-            })
-          }
-          onArchivePlan={archiveActiveWorkoutPlan}
-          onBack={closeWorkout}
-          onCreatePlan={createWorkoutPlan}
-          onDuplicatePlan={duplicateActiveWorkoutPlan}
-          onFinishWorkout={finishWorkout}
-          onLogSet={logWorkoutSet}
-          onLogVoice={logWorkoutVoice}
-          onSelectPlan={selectWorkoutPlan}
-          onSelectExercise={selectWorkoutExercise}
-          onSkipRest={() =>
-            setWorkoutSession((session) => {
-              const nextSession = skipRest(session);
-
-              setAppState((state) =>
-                saveActiveWorkoutSession(state, nextSession),
-              );
-
-              return nextSession;
-            })
-          }
-          onAddExercise={addWorkoutExercise}
-          onMoveExercise={moveWorkoutExercise}
-          onRenamePlan={renameWorkoutPlan}
-          onRemoveExercise={removeWorkoutExercise}
-          onUpdateExercise={editWorkoutExercise}
-        />
-        <AddPlanSurface
-          visible={addPlanVisible}
-          onBack={() => setAddPlanVisible(false)}
-          onSavePlan={saveAddedWorkoutPlan}
-        />
-      </SafeAreaView>
+      <AddPlanSurface
+        key={onboardingReplayKey}
+        embedded
+        visible
+        onBack={finishOnboarding}
+        onSavePlans={saveAddedWorkoutPlans}
+      />
     );
   }
 
@@ -2733,7 +2889,7 @@ function Home() {
       <AddPlanSurface
         visible={addPlanVisible}
         onBack={() => setAddPlanVisible(false)}
-        onSavePlan={saveAddedWorkoutPlan}
+        onSavePlans={saveAddedWorkoutPlans}
       />
     </SafeAreaView>
   );
@@ -3491,14 +3647,24 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     opacity: opacity.title,
   },
+  addPlanBody: {
+    color: colors.foreground,
+    fontSize: 20,
+    letterSpacing: 0,
+    lineHeight: 28,
+    opacity: opacity.body,
+  },
   addPlanPickList: {
     gap: 22,
     marginTop: 28,
   },
   addPlanPickRow: {
     alignItems: "baseline",
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 14,
+    paddingBottom: 13,
   },
   addPlanPickLabel: {
     color: colors.foreground,
@@ -3508,6 +3674,16 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     minWidth: 98,
     opacity: opacity.title,
+  },
+  addPlanPickNote: {
+    color: colors.foreground,
+    flex: 1,
+    fontFamily: typography.mono,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.metadata,
+    textAlign: "right",
   },
   addPlanFooter: {
     color: colors.foreground,
@@ -3542,6 +3718,63 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingBottom: 72,
+  },
+  addPlanQuestion: {
+    flex: 1,
+    justifyContent: "center",
+    paddingBottom: 72,
+  },
+  addPlanQuestionTitle: {
+    color: colors.foreground,
+    fontSize: 26,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 32,
+    maxWidth: 270,
+    opacity: opacity.title,
+  },
+  addPlanQuestionList: {
+    gap: 20,
+    marginTop: 30,
+  },
+  addPlanThinking: {
+    alignItems: "center",
+    flex: 1,
+    gap: 24,
+    justifyContent: "center",
+    paddingBottom: 72,
+  },
+  addPlanThinkingDot: {
+    backgroundColor: colors.foreground,
+    borderRadius: 6,
+    height: 12,
+    opacity: opacity.body,
+    width: 12,
+  },
+  addPlanThinkingLine: {
+    color: colors.foreground,
+    fontSize: 22,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 29,
+    maxWidth: 270,
+    opacity: opacity.title,
+    textAlign: "center",
+  },
+  addPlanTicks: {
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingBottom: 28,
+  },
+  addPlanTick: {
+    backgroundColor: colors.foreground,
+    height: 2,
+    opacity: opacity.hint,
+    width: 18,
+  },
+  addPlanTickActive: {
+    opacity: opacity.body,
   },
   addPlanPageTitle: {
     color: colors.foreground,
@@ -3615,6 +3848,50 @@ const styles = StyleSheet.create({
   addPlanReviewList: {
     gap: 20,
     marginTop: 46,
+  },
+  addPlanPhotoDrop: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.22)",
+    borderRadius: spacing.sheetX - 10,
+    borderStyle: "dashed",
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    height: 280,
+    justifyContent: "center",
+    marginTop: 28,
+  },
+  addPlanPhotoAttached: {
+    borderStyle: "solid",
+  },
+  addPlanPlus: {
+    color: colors.foreground,
+    fontSize: 30,
+    letterSpacing: 0,
+    lineHeight: 34,
+    opacity: opacity.metadata,
+  },
+  addPlanMockPhoto: {
+    backgroundColor: "#fbfbf9",
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    width: 190,
+  },
+  addPlanMockTitle: {
+    color: "#1c1c1e",
+    fontSize: typeScale.metadata,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 19,
+    marginBottom: 8,
+  },
+  addPlanMockLine: {
+    color: "#1c1c1e",
+    fontFamily: typography.mono,
+    fontSize: typeScale.index,
+    letterSpacing: 0,
+    lineHeight: 22,
+    opacity: 0.7,
   },
   addPlanSaved: {
     alignItems: "center",

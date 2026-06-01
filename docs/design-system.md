@@ -2,7 +2,7 @@
 
 stead is a quiet iOS command surface for personal momentum. It should feel calm, direct, and almost invisible until it needs to help.
 
-Onboarding now follows the same black live surface as home: one centered thought, sparse metadata, bottom progress, and text actions. Do not reintroduce separate glass, gradient, or card-heavy onboarding unless the whole app direction changes.
+Onboarding is the add-a-workout-plan flow. First run should open directly into the same root choice, describe, snap, write, review, and saved screens documented in `docs/add-plan-flow.md`. Do not reintroduce a separate motivational onboarding sequence.
 
 ## visual language
 
