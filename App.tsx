@@ -694,7 +694,10 @@ function SettingsSurface({
         </View>
       </View>
 
-      <View style={styles.dayList}>
+      <ScrollView
+        contentContainerStyle={styles.settingsList}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.nudgeLine}>
           <Text style={styles.homeMeta}>account</Text>
           <Text style={styles.bodyText}>
@@ -734,7 +737,9 @@ function SettingsSurface({
         {__DEV__ ? (
           <View style={styles.nudgeLine}>
             <Text style={styles.homeMeta}>dev mode</Text>
-            <Text style={styles.bodyText}>replay onboarding</Text>
+            <PressableScale onPress={onResetOnboarding} scaleTo={0.98}>
+              <Text style={styles.bodyText}>replay onboarding</Text>
+            </PressableScale>
             <Text style={styles.metadataText}>
               resets setup screens only. your plans stay saved.
             </Text>
@@ -745,7 +750,7 @@ function SettingsSurface({
             </View>
           </View>
         ) : null}
-      </View>
+      </ScrollView>
 
       <View style={styles.bottomActions}>
         <ActionText onPress={onBack}>back</ActionText>
@@ -767,6 +772,11 @@ function SettingsSurface({
           <ActionText onPress={onSignIn}>apple</ActionText>
         )}
         <ActionText onPress={onEnableNotifications}>nudges</ActionText>
+        {__DEV__ ? (
+          <ActionText tone="warning" onPress={onResetOnboarding}>
+            reset
+          </ActionText>
+        ) : null}
       </View>
     </View>
   );
@@ -1957,6 +1967,7 @@ function Home() {
     notificationsEnabledAt: null,
     workoutPlanSetAt: null,
   });
+  const [onboardingReplayKey, setOnboardingReplayKey] = useState(0);
   const [surface, setSurfaceState] = useState<Surface>("home");
   const { displayKey: surfaceShown, animatedStyle: surfaceOpacityStyle } =
     useSequentialCrossfade(surface, {
@@ -2455,6 +2466,9 @@ function Home() {
   };
   const resetOnboarding = () => {
     setSurfaceState("home");
+    setWorkoutVisible(false);
+    setAddPlanVisible(false);
+    setOnboardingReplayKey((key) => key + 1);
     setOnboardingState(resetOnboardingState());
   };
 
@@ -2477,6 +2491,7 @@ function Home() {
       <SafeAreaView style={styles.onboardingScreen}>
         <StatusBar style="light" />
         <OnboardingSurface
+          key={onboardingReplayKey}
           onboardingState={onboardingState}
           workoutPlan={workoutPlan}
           onFinish={finishOnboarding}
@@ -3167,6 +3182,11 @@ const styles = StyleSheet.create({
   },
   dayList: {
     gap: 24,
+    paddingTop: 64,
+  },
+  settingsList: {
+    gap: 24,
+    paddingBottom: 40,
     paddingTop: 64,
   },
   emptyDay: {
