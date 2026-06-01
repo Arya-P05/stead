@@ -36,7 +36,7 @@ import {
 import { useSequentialCrossfade } from "./src/ui/sequentialCrossfade";
 import { chooseRecommendation } from "./src/domain/recommendations";
 import { chooseHomeMiddle } from "./src/domain/homeMiddle";
-import type { HomeMiddle } from "./src/domain/homeMiddle";
+import type { HomeMiddle, RemainingItem } from "./src/domain/homeMiddle";
 import {
   addRestTime,
   canFinishWorkoutSession,
@@ -796,6 +796,16 @@ function HomeMiddleSurface({
   onCompleteItem: (itemId: string) => void;
   onWorkout: () => void;
 }) {
+  const [completingItemIds, setCompletingItemIds] = useState<string[]>([]);
+  const completeItemWithMotion = (itemId: string) => {
+    if (completingItemIds.includes(itemId)) {
+      return;
+    }
+
+    setCompletingItemIds((current) => [...current, itemId]);
+    setTimeout(() => onCompleteItem(itemId), 560);
+  };
+
   if (middle.type === "moment") {
     return (
       <View style={styles.homeMiddle}>
@@ -833,27 +843,77 @@ function HomeMiddleSurface({
       ) : (
         <View style={styles.todayThreeList}>
           {middle.items.map((item, index) => (
-            <PressableScale
+            <HomeTodayItemRow
               key={`${item.title}-${index}`}
+              completing={completingItemIds.includes(item.id)}
+              index={index}
+              item={item}
               onPress={() =>
                 item.action === "workout"
                   ? onWorkout()
-                  : onCompleteItem(item.id)
+                  : completeItemWithMotion(item.id)
               }
-              style={styles.todayThreeRow}
-            >
-              <Text style={styles.indexText}>
-                {String(index + 1).padStart(2, "0")}
-              </Text>
-              <Text style={styles.todayThreeTitle}>{item.title}</Text>
-              <Text style={styles.todayThreeAction}>
-                {item.action === "workout" ? "start" : "do"}
-              </Text>
-            </PressableScale>
+            />
           ))}
         </View>
       )}
     </View>
+  );
+}
+
+function HomeTodayItemRow({
+  completing,
+  index,
+  item,
+  onPress,
+}: {
+  completing: boolean;
+  index: number;
+  item: RemainingItem;
+  onPress: () => void;
+}) {
+  const strikeProgress = useSharedValue(0);
+  const secondaryProgress = useSharedValue(0);
+  const strikeStyle = useAnimatedStyle(() => ({
+    opacity: strikeProgress.value,
+    width: `${strikeProgress.value * 100}%`,
+  }));
+  const rowToneStyle = useAnimatedStyle(() => ({
+    opacity: 1 - secondaryProgress.value * 0.48,
+  }));
+
+  useEffect(() => {
+    strikeProgress.value = withTiming(completing ? 1 : 0, { duration: 260 });
+    secondaryProgress.value = withTiming(completing ? 1 : 0, {
+      duration: 260,
+    });
+  }, [completing, secondaryProgress, strikeProgress]);
+
+  return (
+    <PressableScale
+      disabled={completing}
+      onPress={onPress}
+      style={styles.todayThreeRow}
+    >
+      <Animated.Text style={[styles.indexText, rowToneStyle]}>
+        {String(index + 1).padStart(2, "0")}
+      </Animated.Text>
+      <View style={styles.todayThreeTitleWrap}>
+        <Animated.Text
+          style={[
+            styles.todayThreeTitle,
+            completing && styles.todayThreeTitleDone,
+            rowToneStyle,
+          ]}
+        >
+          {item.title}
+        </Animated.Text>
+        <Animated.View style={[styles.todayThreeStrike, strikeStyle]} />
+      </View>
+      <Animated.Text style={[styles.todayThreeAction, rowToneStyle]}>
+        {item.action === "workout" ? "start" : completing ? "done" : "do"}
+      </Animated.Text>
+    </PressableScale>
   );
 }
 
@@ -3170,14 +3230,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
   },
+  todayThreeTitleWrap: {
+    flex: 1,
+    justifyContent: "center",
+  },
   todayThreeTitle: {
     color: colors.foreground,
-    flex: 1,
     fontSize: typeScale.title,
     fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 26,
     opacity: opacity.title,
+  },
+  todayThreeTitleDone: {
+    opacity: opacity.enabled,
+  },
+  todayThreeStrike: {
+    backgroundColor: colors.foreground,
+    height: StyleSheet.hairlineWidth,
+    left: 0,
+    opacity: opacity.enabled,
+    position: "absolute",
+    top: 13,
   },
   todayThreeAction: {
     color: colors.foreground,
