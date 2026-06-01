@@ -1487,7 +1487,7 @@ function AddPlanSurface({
   onSavePlans: (plans: WorkoutPlan[]) => void;
 }) {
   const [screen, setScreen] = useState<AddPlanScreen>("start");
-  const [planName, setPlanName] = useState("push day");
+  const [planName, setPlanName] = useState("");
   const [lifts, setLifts] = useState<AddPlanLiftDraft[]>([]);
   const [liftName, setLiftName] = useState("");
   const [reviewDraft, setReviewDraft] =
@@ -1511,7 +1511,7 @@ function AddPlanSurface({
     }
 
     setScreen("start");
-    setPlanName("push day");
+    setPlanName("");
     setLifts([]);
     setLiftName("");
     setReviewDraft(describedSplit);
@@ -1523,7 +1523,7 @@ function AddPlanSurface({
 
   const resetDraft = () => {
     setScreen("start");
-    setPlanName("push day");
+    setPlanName("");
     setLifts([]);
     setLiftName("");
     setReviewDraft(describedSplit);
@@ -3818,7 +3818,7 @@ const styles = StyleSheet.create({
   addPlanInlineRow: {
     alignItems: "baseline",
     flexDirection: "row",
-    gap: 18,
+    gap: 22,
   },
   addPlanLiftInputWrap: {
     borderBottomColor: "rgba(255,255,255,0.18)",
@@ -3828,9 +3828,9 @@ const styles = StyleSheet.create({
   },
   addPlanLiftInput: {
     color: colors.foreground,
-    fontSize: 32,
+    fontSize: 20,
     letterSpacing: 0,
-    lineHeight: 38,
+    lineHeight: 26,
     opacity: opacity.body,
     padding: 0,
   },
@@ -3838,14 +3838,14 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.18)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingBottom: 10,
-    width: 58,
+    width: 44,
   },
   addPlanNumberInput: {
     color: colors.foreground,
     fontFamily: typography.mono,
-    fontSize: 32,
+    fontSize: 20,
     letterSpacing: 0,
-    lineHeight: 38,
+    lineHeight: 26,
     opacity: opacity.body,
     padding: 0,
     textAlign: "center",
@@ -3853,9 +3853,9 @@ const styles = StyleSheet.create({
   addPlanMultiply: {
     color: colors.foreground,
     fontFamily: typography.mono,
-    fontSize: 32,
+    fontSize: 20,
     letterSpacing: 0,
-    lineHeight: 38,
+    lineHeight: 26,
     opacity: opacity.metadata,
   },
   addPlanReviewList: {
