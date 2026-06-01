@@ -47,6 +47,7 @@ Onboarding now follows the same black live surface as home: one centered thought
 
 - Day schedule and recap use the same index-list shape.
 - Workout is a live surface: exercise card, set log, rest timer, voice log.
+- Add-plan follows `docs/add-plan-flow.md`: root choice screen, inline write builder, review, saved confirmation.
 - Nudges are lockscreen-shaped: one phrase, one text action.
 - Lists use monospaced indexes on the left and time/status metadata on the right.
 - Large centered timers are allowed only for active rest.
