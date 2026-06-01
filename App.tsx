@@ -844,14 +844,18 @@ function HomeMiddleSurface({
         <View style={styles.todayThreeList}>
           {middle.items.map((item, index) => (
             <HomeTodayItemRow
-              key={`${item.title}-${index}`}
-              completing={completingItemIds.includes(item.id)}
+              key={item.id}
+              completing={
+                item.completed === true || completingItemIds.includes(item.id)
+              }
               index={index}
               item={item}
               onPress={() =>
-                item.action === "workout"
-                  ? onWorkout()
-                  : completeItemWithMotion(item.id)
+                item.completed === true
+                  ? undefined
+                  : item.action === "workout"
+                    ? onWorkout()
+                    : completeItemWithMotion(item.id)
               }
             />
           ))}
@@ -911,7 +915,7 @@ function HomeTodayItemRow({
         <Animated.View style={[styles.todayThreeStrike, strikeStyle]} />
       </View>
       <Animated.Text style={[styles.todayThreeAction, rowToneStyle]}>
-        {item.action === "workout" ? "start" : completing ? "done" : "do"}
+        {completing ? "done" : item.action === "workout" ? "start" : "do"}
       </Animated.Text>
     </PressableScale>
   );
@@ -2288,13 +2292,12 @@ function Home() {
   );
   const todayItems = getDailyItemsForDate(appState, today.date);
   const selectedDateItems = getDailyItemsForDate(appState, selectedDate);
-  const openItems = todayItems
-    .filter((item) => item.completedAt === null)
-    .map((item) => ({
-      id: item.id,
-      title: item.title,
-      action: item.kind === "workout" ? ("workout" as const) : undefined,
-    }));
+  const homeItems = todayItems.map((item) => ({
+    id: item.id,
+    title: item.title,
+    action: item.kind === "workout" ? ("workout" as const) : undefined,
+    completed: item.completedAt !== null,
+  }));
   const recommendation = chooseRecommendation({
     steps: latestSteps,
     stepGoal: today.stepGoal,
@@ -2312,7 +2315,7 @@ function Home() {
   const homeMiddle = chooseHomeMiddle({
     minutesWorked: today.focusMinutes,
     recommendation,
-    remainingItems: openItems,
+    remainingItems: homeItems,
     workoutMeta: formatWorkoutPlanMeta(workoutPlan),
   });
   const stepGoalLabel = today.stepGoal.toLocaleString();

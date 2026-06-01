@@ -4,6 +4,7 @@ export type RemainingItem = {
   id: string;
   title: string;
   action?: "workout";
+  completed?: boolean;
 };
 
 export type HomeMiddle =
@@ -67,9 +68,14 @@ export function chooseHomeMiddle({
     };
   }
 
+  const openCount = remainingItems.filter((item) => !item.completed).length;
+
   return {
     type: "today",
-    meta: `${remainingItems.length === 3 ? "three" : remainingItems.length} left today`,
+    meta:
+      openCount === 0
+        ? "clear today"
+        : `${openCount === 3 ? "three" : openCount} left today`,
     items: remainingItems.slice(0, 3),
   };
 }

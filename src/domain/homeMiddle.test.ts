@@ -67,6 +67,32 @@ describe("chooseHomeMiddle", () => {
     });
   });
 
+  it("keeps completed items visible while counting only open items", () => {
+    expect(
+      chooseHomeMiddle({
+        minutesWorked: 80,
+        recommendation: {
+          action: "keep going",
+          reason: "day is on track",
+          type: "steady",
+        },
+        remainingItems: [
+          { completed: true, id: "walk", title: "walk" },
+          { id: "push", title: "push day", action: "workout" },
+          { id: "read", title: "read" },
+        ],
+      }),
+    ).toEqual({
+      type: "today",
+      meta: "2 left today",
+      items: [
+        { completed: true, id: "walk", title: "walk" },
+        { id: "push", title: "push day", action: "workout" },
+        { id: "read", title: "read" },
+      ],
+    });
+  });
+
   it("shows what's next when the next item is a workout", () => {
     expect(
       chooseHomeMiddle({
