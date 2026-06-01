@@ -10,6 +10,7 @@ import {
   markOnboardingNotificationsEnabled,
   markOnboardingWorkoutPlanSet,
   migrateOnboardingState,
+  resetOnboardingState,
   saveOnboardingState,
 } from "./onboarding";
 import type { StorageAdapter } from "./storage";
@@ -88,6 +89,17 @@ describe("onboarding state", () => {
       healthConnectedAt: 2000,
       notificationsEnabledAt: 3000,
       workoutPlanSetAt: 4000,
+    });
+  });
+
+  it("resets onboarding without touching app data", () => {
+    expect(resetOnboardingState()).toEqual({
+      version: 1,
+      completedAt: null,
+      accountConnectedAt: null,
+      healthConnectedAt: null,
+      notificationsEnabledAt: null,
+      workoutPlanSetAt: null,
     });
   });
 

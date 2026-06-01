@@ -111,6 +111,10 @@ export function completeOnboarding(
   };
 }
 
+export function resetOnboardingState(): OnboardingState {
+  return initialOnboardingState;
+}
+
 function isStoredOnboardingState(
   value: unknown,
 ): value is Partial<OnboardingState> {

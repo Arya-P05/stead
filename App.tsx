@@ -87,6 +87,7 @@ import {
   markOnboardingHealthConnected,
   markOnboardingNotificationsEnabled,
   markOnboardingWorkoutPlanSet,
+  resetOnboardingState,
   saveOnboardingState,
   type OnboardingState,
 } from "./src/data/onboarding";
@@ -649,6 +650,7 @@ function SettingsSurface({
   notificationsEnabled,
   onBack,
   onEnableNotifications,
+  onResetOnboarding,
   onSignIn,
   onSignOut,
   onSync,
@@ -662,6 +664,7 @@ function SettingsSurface({
   notificationsEnabled: boolean;
   onBack: () => void;
   onEnableNotifications: () => void;
+  onResetOnboarding: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
   onSync: () => void;
@@ -727,6 +730,21 @@ function SettingsSurface({
           </Text>
           <Text style={styles.metadataText}>local reminders only for v1.</Text>
         </View>
+
+        {__DEV__ ? (
+          <View style={styles.nudgeLine}>
+            <Text style={styles.homeMeta}>dev mode</Text>
+            <Text style={styles.bodyText}>replay onboarding</Text>
+            <Text style={styles.metadataText}>
+              resets setup screens only. your plans stay saved.
+            </Text>
+            <View style={styles.inlineActions}>
+              <ActionText tone="warning" onPress={onResetOnboarding}>
+                reset onboarding
+              </ActionText>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.bottomActions}>
@@ -2435,6 +2453,10 @@ function Home() {
   const finishOnboarding = () => {
     setOnboardingState((state) => completeOnboarding(state));
   };
+  const resetOnboarding = () => {
+    setSurfaceState("home");
+    setOnboardingState(resetOnboardingState());
+  };
 
   if (!hydrated || !onboardingHydrated) {
     return (
@@ -2627,6 +2649,7 @@ function Home() {
             notificationsEnabled={notificationsEnabled}
             onBack={() => setSurfaceState("home")}
             onEnableNotifications={enableNotifications}
+            onResetOnboarding={resetOnboarding}
             onSignIn={signIn}
             onSignOut={signOutOfAccount}
             onSync={syncNow}
