@@ -5,6 +5,7 @@ import {
   AppState as NativeAppState,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -119,6 +120,12 @@ import {
   applyWorkoutVoiceLog,
   parseWorkoutVoiceLog,
 } from "./src/domain/voiceLog";
+import {
+  canSaveAddPlanDraft,
+  createWorkoutPlanFromAddPlanDraft,
+  type AddPlanDraft,
+  type AddPlanLift,
+} from "./src/data/addPlanDraft";
 
 const STEP_GOAL = 10000;
 
@@ -1551,6 +1558,372 @@ function WorkoutSurface({
   );
 }
 
+type AddPlanScreen =
+  | "start"
+  | "write-name"
+  | "write-build"
+  | "review"
+  | "saved";
+
+function AddPlanSurface({
+  visible,
+  onBack,
+  onSavePlan,
+}: {
+  visible: boolean;
+  onBack: () => void;
+  onSavePlan: (plan: WorkoutPlan) => void;
+}) {
+  const [screen, setScreen] = useState<AddPlanScreen>("start");
+  const [planName, setPlanName] = useState("push day");
+  const [lifts, setLifts] = useState<AddPlanLift[]>([]);
+  const [liftName, setLiftName] = useState("");
+  const [sets, setSets] = useState("3");
+  const [reps, setReps] = useState("10");
+  const [savedPlanName, setSavedPlanName] = useState("push day");
+  const draft: AddPlanDraft = {
+    createdVia: "write",
+    kind: "strength",
+    lifts,
+    name: planName,
+  };
+  const canAddLift = liftName.trim().length > 0;
+  const canReview = canSaveAddPlanDraft(draft);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    setScreen("start");
+    setPlanName("push day");
+    setLifts([]);
+    setLiftName("");
+    setSets("3");
+    setReps("10");
+  }, [visible]);
+
+  const resetDraft = () => {
+    setScreen("start");
+    setPlanName("push day");
+    setLifts([]);
+    setLiftName("");
+    setSets("3");
+    setReps("10");
+  };
+  const goBack = () => {
+    if (screen === "start") {
+      onBack();
+      return;
+    }
+
+    if (screen === "write-name") {
+      setScreen("start");
+    } else if (screen === "write-build") {
+      setScreen("write-name");
+    } else if (screen === "review") {
+      setScreen("write-build");
+    } else {
+      onBack();
+    }
+  };
+  const addLift = () => {
+    if (!canAddLift) {
+      return;
+    }
+
+    setLifts((current) => [
+      ...current,
+      {
+        name: liftName,
+        reps: parsePlanNumber(reps, 1) ?? 10,
+        sets: parsePlanNumber(sets, 1) ?? 3,
+      },
+    ]);
+    setLiftName("");
+    setSets("3");
+    setReps("10");
+  };
+  const savePlan = () => {
+    const now = Date.now();
+    const plan = createWorkoutPlanFromAddPlanDraft(draft, now);
+
+    setSavedPlanName(plan.name);
+    onSavePlan(plan);
+    setScreen("saved");
+  };
+
+  return (
+    <Modal
+      animationType="fade"
+      presentationStyle="fullScreen"
+      visible={visible}
+    >
+      <SafeAreaView style={styles.screen}>
+        <StatusBar style="light" />
+        <Animated.View
+          key={screen}
+          entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))}
+          style={styles.addPlanContent}
+        >
+          {screen === "start" ? (
+            <>
+              <Text style={styles.addPlanBrand}>stead</Text>
+              <View style={styles.addPlanCenter}>
+                <View style={styles.addPlanIntro}>
+                  <Text style={styles.addPlanTitle}>
+                    you don't have a plan yet.
+                  </Text>
+                  <Text style={styles.addPlanTitle}>let's build one.</Text>
+                </View>
+                <Text style={styles.metadataText}>
+                  how do you want to start?
+                </Text>
+                <View style={styles.addPlanPickList}>
+                  <AddPlanPickRow
+                    index="01"
+                    label="describe"
+                    note="answer a few"
+                    onPress={() => setScreen("write-name")}
+                  />
+                  <AddPlanPickRow
+                    index="02"
+                    label="snap"
+                    note="from a photo"
+                    onPress={() => setScreen("write-name")}
+                  />
+                  <AddPlanPickRow
+                    index="03"
+                    label="write"
+                    note="by hand"
+                    onPress={() => setScreen("write-name")}
+                  />
+                </View>
+              </View>
+              <Text style={styles.addPlanFooter}>
+                stead structures it · you log the rest live
+              </Text>
+            </>
+          ) : screen === "write-name" ? (
+            <>
+              <AddPlanTopBar onBack={goBack} label="write" />
+              <View style={styles.addPlanCenter}>
+                <Text style={styles.metadataText}>name this day</Text>
+                <TextInput
+                  autoFocus
+                  onChangeText={setPlanName}
+                  onSubmitEditing={() => setScreen("write-build")}
+                  placeholder="push day"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  selectionColor={colors.success}
+                  style={styles.addPlanNameInput}
+                  value={planName}
+                />
+                <Text style={styles.addPlanHint}>
+                  e.g. push day · legs · upper a
+                </Text>
+              </View>
+              <View style={styles.bottomActions}>
+                <ActionText onPress={goBack}>back</ActionText>
+                <ActionText
+                  onPress={() => {
+                    if (planName.trim().length === 0) {
+                      setPlanName("push day");
+                    }
+                    setScreen("write-build");
+                  }}
+                >
+                  next
+                </ActionText>
+              </View>
+            </>
+          ) : screen === "write-build" ? (
+            <>
+              <AddPlanTopBar
+                onBack={goBack}
+                label={`${lifts.length} ${lifts.length === 1 ? "lift" : "lifts"}`}
+              />
+              <View style={styles.addPlanBuilder}>
+                <Text style={styles.addPlanPageTitle}>
+                  {planName.trim() || "push day"}
+                </Text>
+                <ScrollView
+                  contentContainerStyle={styles.addPlanLiftList}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {lifts.length === 0 ? (
+                    <Text style={styles.addPlanEmpty}>
+                      add lifts below — type or say them
+                    </Text>
+                  ) : (
+                    lifts.map((lift, index) => (
+                      <View
+                        key={`${lift.name}-${index}`}
+                        style={styles.addPlanLiftRow}
+                      >
+                        <IndexText active>
+                          {String(index + 1).padStart(2, "0")}
+                        </IndexText>
+                        <Text style={styles.addPlanLiftName}>{lift.name}</Text>
+                        <Text style={styles.monoMeta}>
+                          {lift.sets ?? 3} × {lift.reps ?? 10}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </ScrollView>
+                <View style={styles.addPlanInlineRow}>
+                  <TextInput
+                    onChangeText={setLiftName}
+                    onSubmitEditing={addLift}
+                    placeholder="lift"
+                    placeholderTextColor="rgba(255,255,255,0.22)"
+                    selectionColor={colors.success}
+                    style={styles.addPlanLiftInput}
+                    value={liftName}
+                  />
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={(value) =>
+                      setSets(value.replace(/[^0-9]/g, ""))
+                    }
+                    placeholder="3"
+                    placeholderTextColor="rgba(255,255,255,0.22)"
+                    selectionColor={colors.success}
+                    style={styles.addPlanNumberInput}
+                    value={sets}
+                  />
+                  <Text style={styles.addPlanMultiply}>×</Text>
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={(value) =>
+                      setReps(value.replace(/[^0-9]/g, ""))
+                    }
+                    placeholder="10"
+                    placeholderTextColor="rgba(255,255,255,0.22)"
+                    selectionColor={colors.success}
+                    style={styles.addPlanNumberInput}
+                    value={reps}
+                  />
+                </View>
+              </View>
+              <View style={styles.bottomActions}>
+                <ActionText
+                  onPress={() => {
+                    setLiftName("incline db press");
+                    setSets("3");
+                    setReps("10");
+                  }}
+                >
+                  voice
+                </ActionText>
+                <ActionText disabled={!canAddLift} onPress={addLift}>
+                  add
+                </ActionText>
+                <ActionText
+                  disabled={!canReview}
+                  onPress={() => setScreen("review")}
+                >
+                  review
+                </ActionText>
+              </View>
+            </>
+          ) : screen === "review" ? (
+            <>
+              <AddPlanTopBar onBack={goBack} label="your plan" />
+              <View style={styles.addPlanBuilder}>
+                <Text style={styles.addPlanPageTitle}>
+                  {planName.trim() || "push day"}
+                </Text>
+                <Text style={styles.monoMeta}>
+                  strength · {lifts.length} lifts · ~
+                  {Math.max(20, lifts.length * 9)} min
+                </Text>
+                <View style={styles.addPlanReviewList}>
+                  {lifts.map((lift, index) => (
+                    <View
+                      key={`${lift.name}-${index}`}
+                      style={styles.addPlanLiftRow}
+                    >
+                      <IndexText>
+                        {String(index + 1).padStart(2, "0")}
+                      </IndexText>
+                      <Text style={styles.addPlanLiftName}>{lift.name}</Text>
+                      <Text style={styles.monoMeta}>
+                        {lift.sets ?? 3} × {lift.reps ?? 10}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <View style={styles.bottomActions}>
+                <ActionText onPress={() => setScreen("write-build")}>
+                  add lift
+                </ActionText>
+                <ActionText disabled={!canReview} onPress={savePlan}>
+                  save plan
+                </ActionText>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.addPlanSaved}>
+                <View style={styles.addPlanSuccessLine} />
+                <Text style={styles.addPlanSavedText}>saved</Text>
+                <Text style={styles.addPlanPageTitle}>{savedPlanName}</Text>
+                <Text style={styles.addPlanSavedBody}>
+                  it's in your schedule, ready when you are.
+                </Text>
+              </View>
+              <View style={styles.bottomActions}>
+                <ActionText onPress={resetDraft}>add another</ActionText>
+                <ActionText onPress={onBack}>view schedule</ActionText>
+              </View>
+            </>
+          )}
+        </Animated.View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function AddPlanTopBar({
+  label,
+  onBack,
+}: {
+  label: string;
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.addPlanTopBar}>
+      <PressableScale onPress={onBack} hitSlop={12}>
+        <Text style={styles.addPlanBack}>‹</Text>
+      </PressableScale>
+      <Text style={styles.monoMeta}>{label}</Text>
+    </View>
+  );
+}
+
+function AddPlanPickRow({
+  index,
+  label,
+  note,
+  onPress,
+}: {
+  index: string;
+  label: string;
+  note: string;
+  onPress: () => void;
+}) {
+  return (
+    <PressableScale onPress={onPress} style={styles.addPlanPickRow}>
+      <IndexText>{index}</IndexText>
+      <Text style={styles.addPlanPickLabel}>{label}</Text>
+      <Text style={styles.monoMeta}>— {note}</Text>
+    </PressableScale>
+  );
+}
+
 function Home() {
   const [today, setToday] = useState(() => createTodayContext());
   const [appState, setAppState] = useState<AppState>(() =>
@@ -1583,6 +1956,7 @@ function Home() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [addPlanVisible, setAddPlanVisible] = useState(false);
   const [workoutVisible, setWorkoutVisible] = useState(false);
   const [workoutInitialMode, setWorkoutInitialMode] =
     useState<WorkoutMode>("overview");
@@ -1973,24 +2347,15 @@ function Home() {
     });
   };
   const createWorkoutPlan = () => {
+    setAddPlanVisible(true);
+  };
+  const saveAddedWorkoutPlan = (plan: WorkoutPlan) => {
     const createdAt = Date.now();
-    const plan: WorkoutPlan = {
-      id: `workout-plan-${createdAt}`,
-      name: "new workout",
-      exercises: [
-        {
-          id: `exercise-${createdAt}`,
-          name: "new exercise",
-          targetSets: 3,
-          targetReps: 10,
-          weightLb: 0,
-          restSeconds: 60,
-        },
-      ],
-    };
 
     setAppState((state) => addWorkoutPlan(state, plan, createdAt));
     setWorkoutSession(startWorkoutSession(plan, createdAt));
+    setOnboardingState((state) => markOnboardingWorkoutPlanSet(state));
+    setWorkoutVisible(false);
   };
   const choosePresetWorkoutPlan = (presetId: WorkoutPresetId) => {
     const createdAt = Date.now();
@@ -2138,6 +2503,11 @@ function Home() {
           onRenamePlan={renameWorkoutPlan}
           onRemoveExercise={removeWorkoutExercise}
           onUpdateExercise={editWorkoutExercise}
+        />
+        <AddPlanSurface
+          visible={addPlanVisible}
+          onBack={() => setAddPlanVisible(false)}
+          onSavePlan={saveAddedWorkoutPlan}
         />
       </SafeAreaView>
     );
@@ -2321,6 +2691,11 @@ function Home() {
         onRenamePlan={renameWorkoutPlan}
         onRemoveExercise={removeWorkoutExercise}
         onUpdateExercise={editWorkoutExercise}
+      />
+      <AddPlanSurface
+        visible={addPlanVisible}
+        onBack={() => setAddPlanVisible(false)}
+        onSavePlan={saveAddedWorkoutPlan}
       />
     </SafeAreaView>
   );
@@ -3028,6 +3403,205 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingBottom: 72,
+  },
+  addPlanContent: {
+    flex: 1,
+    paddingBottom: 34,
+    paddingHorizontal: spacing.screenX,
+    paddingTop: spacing.screenTop,
+  },
+  addPlanBrand: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 26,
+    opacity: opacity.title,
+  },
+  addPlanTopBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  addPlanBack: {
+    color: colors.foreground,
+    fontSize: 30,
+    fontWeight: "300",
+    letterSpacing: 0,
+    lineHeight: 34,
+    opacity: opacity.enabled,
+  },
+  addPlanCenter: {
+    flex: 1,
+    justifyContent: "center",
+    paddingBottom: 72,
+  },
+  addPlanIntro: {
+    gap: 2,
+    marginBottom: 54,
+  },
+  addPlanTitle: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 26,
+    opacity: opacity.title,
+  },
+  addPlanPickList: {
+    gap: 22,
+    marginTop: 28,
+  },
+  addPlanPickRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 14,
+  },
+  addPlanPickLabel: {
+    color: colors.foreground,
+    fontSize: typeScale.title,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 26,
+    minWidth: 98,
+    opacity: opacity.title,
+  },
+  addPlanFooter: {
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    opacity: opacity.disabled,
+  },
+  addPlanNameInput: {
+    borderBottomColor: "rgba(255,255,255,0.22)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    color: colors.foreground,
+    fontSize: 32,
+    fontWeight: "500",
+    letterSpacing: 0,
+    lineHeight: 38,
+    marginTop: 18,
+    opacity: opacity.title,
+    paddingBottom: 12,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
+  addPlanHint: {
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    marginTop: 12,
+    opacity: opacity.disabled,
+  },
+  addPlanBuilder: {
+    flex: 1,
+    justifyContent: "center",
+    paddingBottom: 72,
+  },
+  addPlanPageTitle: {
+    color: colors.foreground,
+    fontSize: 26,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 32,
+    opacity: opacity.title,
+  },
+  addPlanLiftList: {
+    gap: 20,
+    paddingBottom: 26,
+    paddingTop: 42,
+  },
+  addPlanEmpty: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.disabled,
+  },
+  addPlanLiftRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 14,
+  },
+  addPlanLiftName: {
+    color: colors.foreground,
+    flex: 1,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+  },
+  addPlanInlineRow: {
+    alignItems: "baseline",
+    borderBottomColor: "rgba(255,255,255,0.18)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 10,
+    paddingBottom: 10,
+  },
+  addPlanLiftInput: {
+    color: colors.foreground,
+    flex: 1,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+    padding: 0,
+  },
+  addPlanNumberInput: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+    padding: 0,
+    textAlign: "center",
+    width: 34,
+  },
+  addPlanMultiply: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.metadata,
+  },
+  addPlanReviewList: {
+    gap: 20,
+    marginTop: 46,
+  },
+  addPlanSaved: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    paddingBottom: 72,
+  },
+  addPlanSuccessLine: {
+    backgroundColor: colors.success,
+    height: 2,
+    marginBottom: 20,
+    width: 26,
+  },
+  addPlanSavedText: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    marginBottom: 18,
+    opacity: opacity.body,
+  },
+  addPlanSavedBody: {
+    color: colors.foreground,
+    fontSize: typeScale.body,
+    letterSpacing: 0,
+    lineHeight: 24,
+    marginTop: 16,
+    maxWidth: 250,
+    opacity: opacity.metadata,
+    textAlign: "center",
   },
   actionText: {
     fontSize: typeScale.action,
