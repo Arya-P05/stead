@@ -1494,8 +1494,8 @@ function AddPlanSurface({
     useState<AddPlanReviewDraft>(describedSplit);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [snapPicked, setSnapPicked] = useState(false);
-  const [sets, setSets] = useState("3");
-  const [reps, setReps] = useState("10");
+  const [sets, setSets] = useState("");
+  const [reps, setReps] = useState("");
   const [savedPlanName, setSavedPlanName] = useState("push day");
   const draft: AddPlanDraft = {
     createdVia: "write",
@@ -1517,8 +1517,8 @@ function AddPlanSurface({
     setReviewDraft(describedSplit);
     setSelectedDayIndex(0);
     setSnapPicked(false);
-    setSets("3");
-    setReps("10");
+    setSets("");
+    setReps("");
   }, [visible]);
 
   const resetDraft = () => {
@@ -1529,8 +1529,8 @@ function AddPlanSurface({
     setReviewDraft(describedSplit);
     setSelectedDayIndex(0);
     setSnapPicked(false);
-    setSets("3");
-    setReps("10");
+    setSets("");
+    setReps("");
   };
   const goBack = () => {
     if (screen === "start") {
@@ -1566,12 +1566,12 @@ function AddPlanSurface({
       {
         name: liftName.trim().toLowerCase(),
         reps: parsePlanNumber(reps, 1) ?? 10,
-        sets: parsePlanNumber(sets, 1) ?? 3,
+        sets: parsePlanNumber(sets, 1) ?? 4,
       },
     ]);
     setLiftName("");
-    setSets("3");
-    setReps("10");
+    setSets("");
+    setReps("");
   };
   const savePlan = () => {
     const now = Date.now();
@@ -1824,45 +1824,51 @@ function AddPlanSurface({
                 )}
               </ScrollView>
               <View style={styles.addPlanInlineRow}>
-                <TextInput
-                  onChangeText={setLiftName}
-                  onSubmitEditing={addLift}
-                  placeholder="lift"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  selectionColor={colors.success}
-                  style={styles.addPlanLiftInput}
-                  value={liftName}
-                />
-                <TextInput
-                  keyboardType="number-pad"
-                  onChangeText={(value) =>
-                    setSets(value.replace(/[^0-9]/g, ""))
-                  }
-                  placeholder="3"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  selectionColor={colors.success}
-                  style={styles.addPlanNumberInput}
-                  value={sets}
-                />
+                <View style={styles.addPlanLiftInputWrap}>
+                  <TextInput
+                    onChangeText={setLiftName}
+                    onSubmitEditing={addLift}
+                    placeholder="lift"
+                    placeholderTextColor="rgba(255,255,255,0.36)"
+                    selectionColor={colors.success}
+                    style={styles.addPlanLiftInput}
+                    value={liftName}
+                  />
+                </View>
+                <View style={styles.addPlanNumberInputWrap}>
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={(value) =>
+                      setSets(value.replace(/[^0-9]/g, ""))
+                    }
+                    placeholder="4"
+                    placeholderTextColor="rgba(255,255,255,0.36)"
+                    selectionColor={colors.success}
+                    style={styles.addPlanNumberInput}
+                    value={sets}
+                  />
+                </View>
                 <Text style={styles.addPlanMultiply}>×</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  onChangeText={(value) =>
-                    setReps(value.replace(/[^0-9]/g, ""))
-                  }
-                  placeholder="10"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  selectionColor={colors.success}
-                  style={styles.addPlanNumberInput}
-                  value={reps}
-                />
+                <View style={styles.addPlanNumberInputWrap}>
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={(value) =>
+                      setReps(value.replace(/[^0-9]/g, ""))
+                    }
+                    placeholder="10"
+                    placeholderTextColor="rgba(255,255,255,0.36)"
+                    selectionColor={colors.success}
+                    style={styles.addPlanNumberInput}
+                    value={reps}
+                  />
+                </View>
               </View>
             </View>
             <View style={styles.bottomActions}>
               <ActionText
                 onPress={() => {
                   setLiftName("incline db press");
-                  setSets("3");
+                  setSets("4");
                   setReps("10");
                 }}
               >
@@ -3811,38 +3817,45 @@ const styles = StyleSheet.create({
   },
   addPlanInlineRow: {
     alignItems: "baseline",
+    flexDirection: "row",
+    gap: 18,
+  },
+  addPlanLiftInputWrap: {
     borderBottomColor: "rgba(255,255,255,0.18)",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 10,
+    flex: 1,
     paddingBottom: 10,
   },
   addPlanLiftInput: {
     color: colors.foreground,
-    flex: 1,
-    fontSize: typeScale.body,
+    fontSize: 32,
     letterSpacing: 0,
-    lineHeight: 24,
+    lineHeight: 38,
     opacity: opacity.body,
     padding: 0,
+  },
+  addPlanNumberInputWrap: {
+    borderBottomColor: "rgba(255,255,255,0.18)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 10,
+    width: 58,
   },
   addPlanNumberInput: {
     color: colors.foreground,
     fontFamily: typography.mono,
-    fontSize: typeScale.body,
+    fontSize: 32,
     letterSpacing: 0,
-    lineHeight: 24,
+    lineHeight: 38,
     opacity: opacity.body,
     padding: 0,
     textAlign: "center",
-    width: 34,
   },
   addPlanMultiply: {
     color: colors.foreground,
     fontFamily: typography.mono,
-    fontSize: typeScale.body,
+    fontSize: 32,
     letterSpacing: 0,
-    lineHeight: 24,
+    lineHeight: 38,
     opacity: opacity.metadata,
   },
   addPlanReviewList: {
