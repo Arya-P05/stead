@@ -2,6 +2,7 @@ import {
   addDailyOutcome,
   addDailyItem,
   addStepSample,
+  addWeighIn,
   addWorkoutOutcome,
   addWorkoutPlan,
   archiveWorkoutPlan,
@@ -15,6 +16,7 @@ import {
   getStepsForDate,
   hasCompletedWorkout,
   hasCompletedWorkoutOnDate,
+  hasWeighInForDate,
   reorderDailyItem,
   saveActiveWorkoutSession,
   saveWorkoutPlan,
@@ -30,7 +32,7 @@ describe("app state", () => {
     const workoutPlan = createDefaultWorkoutPlan();
 
     expect(createInitialAppState()).toEqual({
-      version: 4,
+      version: 5,
       dailyOutcomes: [],
       dailyItems: [],
       dailyPlans: [],
@@ -38,6 +40,12 @@ describe("app state", () => {
       activeWorkoutSession: null,
       exerciseWeights: {},
       stepSamples: [],
+      weighIns: [],
+      morningWeighIn: {
+        unit: "kg",
+        entryMethod: "dial",
+        wakeTime: "06:30",
+      },
       activeWorkoutPlanId: workoutPlan.id,
       workoutPlan,
       workoutPlans: [
@@ -49,6 +57,25 @@ describe("app state", () => {
         },
       ],
     });
+  });
+
+  it("stores one weigh-in per day in canonical kg", () => {
+    const state = addWeighIn(createInitialAppState(), {
+      t: new Date("2026-06-08T06:30:00.000Z").getTime(),
+      kg: 75.12,
+    });
+    const updated = addWeighIn(state, {
+      t: new Date("2026-06-08T07:00:00.000Z").getTime(),
+      kg: 75.2,
+    });
+
+    expect(updated.weighIns).toEqual([
+      {
+        t: new Date("2026-06-08T07:00:00.000Z").getTime(),
+        kg: 75.2,
+      },
+    ]);
+    expect(hasWeighInForDate(updated, "2026-06-08")).toBe(true);
   });
 
   it("stores one outcome per day and replaces newer saves", () => {

@@ -1,4 +1,7 @@
-import { scheduleRecommendationNudge } from "./notifications";
+import {
+  scheduleMorningWeighInReminder,
+  scheduleRecommendationNudge,
+} from "./notifications";
 
 function createAdapter(
   status: "granted" | "denied" | "undetermined" = "granted",
@@ -63,5 +66,65 @@ describe("scheduleRecommendationNudge", () => {
       ),
     ).resolves.toBeNull();
     expect(adapter.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("scheduleMorningWeighInReminder", () => {
+  it("schedules the morning weigh-in payload at the user's wake time", async () => {
+    const adapter = createAdapter("granted");
+
+    await expect(
+      scheduleMorningWeighInReminder(
+        {
+          wakeTime: "06:30",
+          hasLoggedToday: false,
+          now: new Date("2026-06-08T06:00:00.000-04:00"),
+        },
+        adapter,
+      ),
+    ).resolves.toBe("notification-id");
+    expect(adapter.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
+      "stead-morning-weigh-in",
+    );
+    expect(adapter.scheduleNotificationAsync).toHaveBeenCalledWith({
+      identifier: "stead-morning-weigh-in",
+      content: {
+        title: "stead",
+        subtitle: "good morning",
+        body: "step on the scale — log today's weight before the day starts.",
+        sound: false,
+        data: { source: "stead", screen: "morning-weigh-in" },
+      },
+      trigger: {
+        type: "timeInterval",
+        seconds: 1800,
+      },
+    });
+  });
+
+  it("schedules tomorrow when today's weight is already logged", async () => {
+    const adapter = createAdapter("granted");
+
+    await expect(
+      scheduleMorningWeighInReminder(
+        {
+          wakeTime: "06:30",
+          hasLoggedToday: true,
+          now: new Date("2026-06-08T06:00:00.000-04:00"),
+        },
+        adapter,
+      ),
+    ).resolves.toBe("notification-id");
+    expect(adapter.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
+      "stead-morning-weigh-in",
+    );
+    expect(adapter.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trigger: {
+          type: "timeInterval",
+          seconds: 88200,
+        },
+      }),
+    );
   });
 });

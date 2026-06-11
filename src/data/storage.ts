@@ -40,6 +40,7 @@ export function migrateAppState(stored: unknown): AppState {
     stored.version === 1 ||
     stored.version === 2 ||
     stored.version === 3 ||
+    stored.version === 4 ||
     stored.version === CURRENT_APP_STATE_VERSION
   ) {
     const workoutPlan = normalizeWorkoutPlan(stored.workoutPlan);
@@ -71,6 +72,15 @@ export function migrateAppState(stored: unknown): AppState {
       activeWorkoutPlanId,
       workoutPlan,
       workoutPlans,
+      weighIns: Array.isArray(stored.weighIns) ? stored.weighIns : [],
+      morningWeighIn: {
+        ...createInitialAppState().morningWeighIn,
+        ...(typeof stored.morningWeighIn === "object" &&
+        stored.morningWeighIn !== null
+          ? stored.morningWeighIn
+          : {}),
+        unit: "lb",
+      },
     };
   }
 

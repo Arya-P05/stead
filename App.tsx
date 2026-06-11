@@ -1,9 +1,11 @@
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState as NativeAppState,
+  LayoutChangeEvent,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +22,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Circle, Path } from "react-native-svg";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   colors,
@@ -52,6 +55,7 @@ import type { WorkoutPlan, WorkoutSession } from "./src/domain/workoutSession";
 import {
   addDailyItem,
   addDailyOutcome,
+  addWeighIn,
   addWorkoutOutcome,
   addWorkoutPlan,
   archiveWorkoutPlan,
@@ -64,6 +68,7 @@ import {
   getActiveWorkoutPlan,
   getDailyItemsForDate,
   getStepsForDate,
+  hasWeighInForDate,
   hasCompletedWorkoutOnDate,
   reorderDailyItem,
   saveActiveWorkoutSession,
@@ -71,12 +76,16 @@ import {
   seedDailyPlanForWorkout,
   setActiveWorkoutPlan,
   updateDailyItem,
+  updateMorningWeighInSettings,
   upsertExerciseWeight,
 } from "./src/data/appState";
 import type {
   AppState,
   DailyItem,
   ManagedWorkoutPlan,
+  WeighInEntry,
+  WeighInEntryMethod,
+  WeightUnit,
 } from "./src/data/appState";
 import { loadAppState, saveAppState } from "./src/data/storage";
 import {
@@ -102,7 +111,11 @@ import {
 } from "./src/services/auth";
 import { isSupabaseConfigured } from "./src/services/supabaseClient";
 import { syncAppState, type SyncStatus } from "./src/services/sync";
-import { scheduleRecommendationNudge } from "./src/services/notifications";
+import {
+  addMorningWeighInResponseListener,
+  scheduleMorningWeighInReminder,
+  scheduleRecommendationNudge,
+} from "./src/services/notifications";
 import {
   addExercise,
   createDefaultWorkoutPlan,
@@ -181,7 +194,7 @@ function formatWorkoutPlanMeta(plan: WorkoutPlan) {
 type FeedbackState = "idle" | "success" | "warning";
 type HealthSyncStatus = "idle" | "syncing" | "synced" | "denied" | "error";
 type WorkoutMode = "overview" | "exercise" | "voice" | "plan" | "plans";
-type Surface = "home" | "calendar" | "day" | "plan" | "settings";
+type Surface = "home" | "calendar" | "day" | "plan" | "settings" | "weighIn";
 function parseWorkoutVisualKey(key: string): {
   mode: WorkoutMode;
   isResting: boolean;
@@ -264,6 +277,547 @@ function IndexText({
     <Text style={[styles.indexText, active && styles.activeText]}>
       {children}
     </Text>
+  );
+}
+
+const KG_PER_LB = 0.45359237;
+
+function toDisplayWeight(kg: number, unit: WeightUnit) {
+  return unit === "lb" ? kg / KG_PER_LB : kg;
+}
+
+function toKg(value: number, unit: WeightUnit) {
+  return unit === "lb" ? value * KG_PER_LB : value;
+}
+
+function roundWeight(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function formatWeighInDate(timestamp: number) {
+  const date = new Date(timestamp);
+  const day = date
+    .toLocaleDateString("en-US", { weekday: "short" })
+    .toLowerCase();
+  const month = date
+    .toLocaleDateString("en-US", { month: "short" })
+    .toLowerCase();
+
+  return `${day} · ${month} ${date.getDate()}`;
+}
+
+function formatSignedWeight(value: number) {
+  if (value === 0) {
+    return "±0.0";
+  }
+
+  return `${value > 0 ? "+" : "−"}${Math.abs(value).toFixed(1)}`;
+}
+
+function createSeedWeighIns(today = new Date()): WeighInEntry[] {
+  const base = [
+    76.4, 76.6, 76.1, 76.3, 75.9, 76.0, 75.6, 75.8, 75.4, 75.5, 75.2, 75.4,
+    75.0, 75.1,
+  ];
+
+  return base.map((kg, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (base.length - index));
+    date.setHours(6, 30, 0, 0);
+    return { t: date.getTime(), kg };
+  });
+}
+
+function FlowHead({ onBack, right }: { onBack?: () => void; right: string }) {
+  return (
+    <View style={styles.weighFlowHead}>
+      {onBack ? (
+        <PressableScale onPress={onBack} hitSlop={12}>
+          <Text style={styles.weighBack}>‹</Text>
+        </PressableScale>
+      ) : (
+        <Text style={styles.titleText}>stead</Text>
+      )}
+      <Text style={styles.monoMeta}>{right}</Text>
+    </View>
+  );
+}
+
+function WeightHero({
+  size,
+  unit,
+  value,
+}: {
+  size: "entry" | "logged";
+  unit: WeightUnit;
+  value: string;
+}) {
+  return (
+    <View style={styles.weightHeroRow}>
+      <Text
+        style={[
+          styles.weightHeroNumber,
+          size === "logged" && styles.weightHeroNumberLogged,
+        ]}
+      >
+        {value}
+      </Text>
+      <Text style={styles.weightHeroUnit}>{unit}</Text>
+    </View>
+  );
+}
+
+function Dial({
+  max,
+  min,
+  onChange,
+  unit,
+  value,
+}: {
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  unit: WeightUnit;
+  value: number;
+}) {
+  const [width, setWidth] = useState(304);
+  const start = useRef({ x: 0, value });
+  const valueRef = useRef(value);
+  const pxPerUnit = unit === "lb" ? 52 : 110;
+  const step = unit === "lb" ? 0.2 : 0.1;
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderGrant: (_, gesture) => {
+          start.current = { x: gesture.x0, value: valueRef.current };
+        },
+        onPanResponderMove: (_, gesture) => {
+          const delta = (start.current.x - gesture.moveX) / pxPerUnit;
+          const snapped = roundWeight(
+            Math.round((start.current.value + delta) / step) * step,
+          );
+          onChange(Math.min(max, Math.max(min, snapped)));
+        },
+      }),
+    [max, min, onChange, pxPerUnit, step],
+  );
+
+  const center = width / 2;
+  const span = width / pxPerUnit / 2 + 1;
+  const low = Math.floor((value - span) / step) * step;
+  const ticks: Array<{
+    x: number;
+    value: number;
+    isWhole: boolean;
+    isHalf: boolean;
+  }> = [];
+
+  for (let tick = low; tick <= value + span; tick = roundWeight(tick + step)) {
+    if (tick < min - 1 || tick > max + 1) {
+      continue;
+    }
+    const x = center + (tick - value) * pxPerUnit;
+    if (x < -4 || x > width + 4) {
+      continue;
+    }
+    const isWhole = Math.abs(tick - Math.round(tick)) < 0.001;
+    const isHalf =
+      !isWhole && Math.abs(tick * 2 - Math.round(tick * 2)) < 0.001;
+    ticks.push({ x, value: tick, isWhole, isHalf });
+  }
+
+  return (
+    <View>
+      <View
+        {...panResponder.panHandlers}
+        onLayout={(event: LayoutChangeEvent) =>
+          setWidth(event.nativeEvent.layout.width)
+        }
+        style={styles.dial}
+      >
+        {ticks.map((tick) => (
+          <View
+            key={`${tick.value}`}
+            style={[styles.dialTickWrap, { left: tick.x }]}
+          >
+            <View
+              style={[
+                styles.dialTick,
+                tick.isWhole
+                  ? styles.dialTickWhole
+                  : tick.isHalf
+                    ? styles.dialTickHalf
+                    : styles.dialTickMinor,
+              ]}
+            />
+            {tick.isWhole ? (
+              <Text style={styles.dialLabel}>{Math.round(tick.value)}</Text>
+            ) : null}
+          </View>
+        ))}
+        <View style={[styles.dialNeedle, { left: center }]} />
+        <View style={[styles.dialNeedleDot, { left: center }]} />
+        <View style={styles.dialFadeLeft} pointerEvents="none" />
+        <View style={styles.dialFadeRight} pointerEvents="none" />
+      </View>
+      <Text style={styles.dialCaption}>drag to today's reading</Text>
+    </View>
+  );
+}
+
+function Keypad({
+  accent,
+  entry,
+  onEntry,
+}: {
+  accent: string;
+  entry: string;
+  onEntry: (value: string) => void;
+}) {
+  const press = (key: string) => {
+    let next = entry;
+    if (key === "del") {
+      next = next.slice(0, -1);
+    } else if (key === ".") {
+      if (!next.includes(".")) {
+        next = `${next || "0"}.`;
+      }
+    } else {
+      if (next.includes(".") && next.split(".")[1].length >= 1) {
+        return;
+      }
+      if (next.replace(".", "").length >= 4) {
+        return;
+      }
+      next = `${next}${key}`;
+    }
+    onEntry(next);
+  };
+
+  return (
+    <View style={styles.keypad}>
+      {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map(
+        (key) => (
+          <PressableScale
+            key={key}
+            onPress={() => press(key)}
+            style={styles.keypadKey}
+            scaleTo={0.98}
+          >
+            <Text
+              style={[
+                styles.keypadText,
+                key === "del" && { color: accent, opacity: opacity.enabled },
+              ]}
+            >
+              {key === "del" ? "⌫" : key}
+            </Text>
+          </PressableScale>
+        ),
+      )}
+    </View>
+  );
+}
+
+function Sparkline({
+  data,
+  width = 304,
+  height = 56,
+}: {
+  data: number[];
+  width?: number;
+  height?: number;
+}) {
+  if (data.length < 2) {
+    return null;
+  }
+
+  const low = Math.min(...data);
+  const high = Math.max(...data);
+  const pad = (high - low) * 0.35 || 1;
+  const min = low - pad;
+  const max = high + pad;
+  const points = data.map((value, index) => {
+    const x = (index / (data.length - 1)) * width;
+    const y = height - ((value - min) / (max - min)) * height;
+    return { x, y };
+  });
+  const path = points
+    .map(
+      (point, index) =>
+        `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`,
+    )
+    .join(" ");
+  const last = points[points.length - 1];
+
+  return (
+    <Svg height={height} width={width}>
+      <Path
+        d={path}
+        fill="none"
+        stroke={colors.foreground}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={opacity.enabled}
+        strokeWidth={1.5}
+      />
+      <Circle cx={last.x} cy={last.y} fill={colors.success} r={3.2} />
+    </Svg>
+  );
+}
+
+function MorningWeighInSurface({
+  entryMethod,
+  history,
+  onBack,
+  onLog,
+  unit,
+}: {
+  entryMethod: WeighInEntryMethod;
+  history: WeighInEntry[];
+  onBack: () => void;
+  onLog: (entry: WeighInEntry) => void;
+  unit: WeightUnit;
+}) {
+  const initialHistory = useRef(
+    history.length > 0 ? history : createSeedWeighIns(),
+  );
+  const fallbackHistory = initialHistory.current;
+  const [screen, setScreen] = useState<"weigh" | "logged" | "history">("weigh");
+  const [historyBack, setHistoryBack] = useState<"weigh" | "logged">("weigh");
+  const [logged, setLogged] = useState<WeighInEntry | null>(null);
+  const yesterday = fallbackHistory[fallbackHistory.length - 1];
+  const [value, setValue] = useState(() =>
+    roundWeight(toDisplayWeight(yesterday.kg, unit)),
+  );
+  const [entry, setEntry] = useState(() =>
+    roundWeight(toDisplayWeight(yesterday.kg, unit)).toFixed(1),
+  );
+  const previousUnit = useRef(unit);
+
+  useEffect(() => {
+    if (previousUnit.current !== unit) {
+      setValue((current) => {
+        const next = roundWeight(
+          toDisplayWeight(toKg(current, previousUnit.current), unit),
+        );
+        setEntry(next.toFixed(1));
+        return next;
+      });
+      previousUnit.current = unit;
+    }
+  }, [unit]);
+
+  useEffect(() => {
+    if (entryMethod === "dial") {
+      setEntry(value.toFixed(1));
+    }
+  }, [entryMethod, value]);
+
+  const setFromEntry = (next: string) => {
+    setEntry(next);
+    const parsed = Number.parseFloat(next);
+    if (!Number.isNaN(parsed)) {
+      setValue(roundWeight(parsed));
+    }
+  };
+
+  const todayHistory = logged ? [...fallbackHistory, logged] : fallbackHistory;
+  const yDisplay = roundWeight(toDisplayWeight(yesterday.kg, unit));
+  const delta = roundWeight(value - yDisplay);
+  const deltaCopy =
+    delta === 0
+      ? "same as yesterday"
+      : `${delta > 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)} ${unit} from yesterday`;
+
+  const commitLog = () => {
+    const next = { t: Date.now(), kg: toKg(value, unit) };
+    setLogged(next);
+    onLog(next);
+    setScreen("logged");
+  };
+
+  if (screen === "history") {
+    return (
+      <View style={styles.weighContent}>
+        <FlowHead onBack={() => setScreen(historyBack)} right="history" />
+        <View style={styles.weighHistoryTitle}>
+          <Text style={styles.titleText}>every morning</Text>
+          <Text style={styles.monoMeta}>{todayHistory.length} entries</Text>
+        </View>
+        <ScrollView
+          contentContainerStyle={styles.weighHistoryList}
+          showsVerticalScrollIndicator={false}
+        >
+          {[...todayHistory].reverse().map((item, index, rows) => {
+            const display = roundWeight(toDisplayWeight(item.kg, unit));
+            const previous = rows[index + 1];
+            const previousDisplay = previous
+              ? roundWeight(toDisplayWeight(previous.kg, unit))
+              : null;
+            const dayDelta =
+              previousDisplay === null
+                ? null
+                : roundWeight(display - previousDisplay);
+
+            return (
+              <View key={`${item.t}`} style={styles.weighHistoryRow}>
+                <IndexText active={index === 0}>
+                  {String(todayHistory.length - index).padStart(2, "0")}
+                </IndexText>
+                <View style={styles.weighHistoryMain}>
+                  <Text
+                    style={[
+                      styles.bodyText,
+                      index === 0 ? styles.activeText : null,
+                    ]}
+                  >
+                    {formatWeighInDate(item.t)}
+                  </Text>
+                  <View style={styles.weighHistoryValue}>
+                    {dayDelta !== null ? (
+                      <Text style={styles.monoMeta}>
+                        {formatSignedWeight(dayDelta)}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.weighHistoryReading}>
+                      {display.toFixed(1)} {unit}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+        <View style={[styles.bottomActions, styles.weighSingleAction]}>
+          <ActionText onPress={() => setScreen(historyBack)}>back</ActionText>
+        </View>
+      </View>
+    );
+  }
+
+  if (screen === "logged") {
+    const series = todayHistory
+      .slice(-7)
+      .map((item) => roundWeight(toDisplayWeight(item.kg, unit)));
+    const weekAgo =
+      todayHistory.length > 7
+        ? roundWeight(
+            toDisplayWeight(todayHistory[todayHistory.length - 8].kg, unit),
+          )
+        : series[0];
+    const previous = todayHistory[todayHistory.length - 2] ?? yesterday;
+    const yesterdayDelta = roundWeight(
+      value - roundWeight(toDisplayWeight(previous.kg, unit)),
+    );
+    const weekDelta = roundWeight(value - weekAgo);
+
+    return (
+      <View style={styles.weighContent}>
+        <FlowHead right="logged" />
+        <View style={styles.loggedStage}>
+          <View style={styles.loggedConfirm}>
+            <View style={styles.loggedPulseLine} />
+            <Text style={[styles.monoMeta, styles.weighEnabledText]}>
+              logged · {formatWeighInDate(Date.now())}
+            </Text>
+          </View>
+          <WeightHero size="logged" unit={unit} value={value.toFixed(1)} />
+          <View style={styles.loggedStats}>
+            <View style={styles.loggedStat}>
+              <Text style={styles.metadataText}>yesterday</Text>
+              <Text style={styles.loggedStatValue}>
+                {formatSignedWeight(yesterdayDelta)}
+              </Text>
+            </View>
+            <View style={[styles.loggedStat, styles.loggedStatRight]}>
+              <Text style={styles.metadataText}>past 7 days</Text>
+              <Text style={styles.loggedStatValue}>
+                {formatSignedWeight(weekDelta)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.sparklineBlock}>
+            <Sparkline data={series} />
+            <View style={styles.sparklineCaptions}>
+              <Text style={styles.dialCaption}>7 mornings ago</Text>
+              <Text style={styles.dialCaption}>today</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.bottomActions}>
+          <ActionText
+            onPress={() => {
+              setHistoryBack("logged");
+              setScreen("history");
+            }}
+          >
+            history
+          </ActionText>
+          <ActionText onPress={onBack}>done</ActionText>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.weighContent}>
+      <FlowHead onBack={onBack} right={formatWeighInDate(Date.now())} />
+      <Text style={[styles.metadataText, styles.weighGreeting]}>
+        good morning
+      </Text>
+      <View style={styles.weighStage}>
+        <WeightHero
+          size="entry"
+          unit={unit}
+          value={entryMethod === "keypad" ? entry || "0" : value.toFixed(1)}
+        />
+        <Text
+          style={[
+            styles.monoMeta,
+            styles.weighDelta,
+            delta !== 0 && styles.weighEnabledText,
+          ]}
+        >
+          {deltaCopy}
+        </Text>
+        <View style={styles.weighControl}>
+          {entryMethod === "keypad" ? (
+            <Keypad
+              accent={colors.success}
+              entry={entry}
+              onEntry={setFromEntry}
+            />
+          ) : (
+            <Dial
+              max={unit === "lb" ? 350 : 160}
+              min={unit === "lb" ? 80 : 35}
+              onChange={setValue}
+              unit={unit}
+              value={value}
+            />
+          )}
+        </View>
+      </View>
+      <View style={styles.bottomActions}>
+        <ActionText
+          onPress={() => {
+            setHistoryBack("weigh");
+            setScreen("history");
+          }}
+        >
+          history
+        </ActionText>
+        <ActionText onPress={() => setTimeout(commitLog, 260)}>log</ActionText>
+      </View>
+    </View>
   );
 }
 
@@ -613,9 +1167,15 @@ function SettingsSurface({
   authMessage,
   authState,
   healthSyncStatus,
+  morningEntryMethod,
+  morningUnit,
+  morningWakeTime,
   notificationsEnabled,
   onBack,
   onEnableNotifications,
+  onSetMorningEntryMethod,
+  onSetMorningUnit,
+  onSetMorningWakeTime,
   onResetOnboarding,
   onSignIn,
   onSignOut,
@@ -627,9 +1187,15 @@ function SettingsSurface({
   authMessage: string | null;
   authState: AuthState;
   healthSyncStatus: HealthSyncStatus;
+  morningEntryMethod: WeighInEntryMethod;
+  morningUnit: WeightUnit;
+  morningWakeTime: string;
   notificationsEnabled: boolean;
   onBack: () => void;
   onEnableNotifications: () => void;
+  onSetMorningEntryMethod: (entryMethod: WeighInEntryMethod) => void;
+  onSetMorningUnit: (unit: WeightUnit) => void;
+  onSetMorningWakeTime: (wakeTime: string) => void;
   onResetOnboarding: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
@@ -698,6 +1264,50 @@ function SettingsSurface({
             {notificationsEnabled ? "nudges on" : "nudges off"}
           </Text>
           <Text style={styles.metadataText}>local reminders only for v1.</Text>
+        </View>
+
+        <View style={styles.nudgeLine}>
+          <Text style={styles.homeMeta}>morning weigh-in</Text>
+          <Text style={styles.bodyText}>
+            {morningWakeTime} · {morningUnit} · {morningEntryMethod}
+          </Text>
+          <Text style={styles.metadataText}>
+            opens straight to today's number when the reminder is tapped.
+          </Text>
+          <TextInput
+            keyboardType="numbers-and-punctuation"
+            onChangeText={onSetMorningWakeTime}
+            placeholder="06:30"
+            placeholderTextColor="rgba(255,255,255,0.22)"
+            style={styles.settingsTimeInput}
+            value={morningWakeTime}
+          />
+          <View style={styles.inlineActions}>
+            <ActionText
+              disabled={morningUnit === "kg"}
+              onPress={() => onSetMorningUnit("kg")}
+            >
+              kg
+            </ActionText>
+            <ActionText
+              disabled={morningUnit === "lb"}
+              onPress={() => onSetMorningUnit("lb")}
+            >
+              lb
+            </ActionText>
+            <ActionText
+              disabled={morningEntryMethod === "dial"}
+              onPress={() => onSetMorningEntryMethod("dial")}
+            >
+              dial
+            </ActionText>
+            <ActionText
+              disabled={morningEntryMethod === "keypad"}
+              onPress={() => onSetMorningEntryMethod("keypad")}
+            >
+              keypad
+            </ActionText>
+          </View>
         </View>
 
         {__DEV__ ? (
@@ -903,16 +1513,18 @@ function HomeTodayItemRow({
         {String(index + 1).padStart(2, "0")}
       </Animated.Text>
       <View style={styles.todayThreeTitleWrap}>
-        <Animated.Text
-          style={[
-            styles.todayThreeTitle,
-            completing && styles.todayThreeTitleDone,
-            rowToneStyle,
-          ]}
-        >
-          {item.title}
-        </Animated.Text>
-        <Animated.View style={[styles.todayThreeStrike, strikeStyle]} />
+        <View style={styles.todayThreeTitleInner}>
+          <Animated.Text
+            style={[
+              styles.todayThreeTitle,
+              completing && styles.todayThreeTitleDone,
+              rowToneStyle,
+            ]}
+          >
+            {item.title}
+          </Animated.Text>
+          <Animated.View style={[styles.todayThreeStrike, strikeStyle]} />
+        </View>
       </View>
       <Animated.Text style={[styles.todayThreeAction, rowToneStyle]}>
         {completing ? "done" : item.action === "workout" ? "start" : "do"}
@@ -1604,6 +2216,7 @@ function AddPlanSurface({
     }
 
     if (screen === "write-name") {
+      setPlanName("");
       setScreen("start");
     } else if (screen === "write-build") {
       setScreen("write-name");
@@ -1711,9 +2324,7 @@ function AddPlanSurface({
                 />
               </View>
             </View>
-            <Text style={styles.addPlanFooter}>
-              stead structures it · you log the rest live
-            </Text>
+            <Text style={styles.addPlanFooter}>stead structures it</Text>
           </>
         ) : screen === "describe-goal" ? (
           <AddPlanQuestion
@@ -1836,7 +2447,9 @@ function AddPlanSurface({
               <TextInput
                 autoFocus
                 onChangeText={setPlanName}
-                onSubmitEditing={() => setScreen("write-build")}
+                onSubmitEditing={() => {
+                  if (planName.trim().length > 0) setScreen("write-build");
+                }}
                 placeholder="push day"
                 placeholderTextColor="rgba(255,255,255,0.22)"
                 selectionColor={colors.success}
@@ -1850,12 +2463,8 @@ function AddPlanSurface({
             <View style={styles.bottomActions}>
               <ActionText onPress={goBack}>back</ActionText>
               <ActionText
-                onPress={() => {
-                  if (planName.trim().length === 0) {
-                    setPlanName("push day");
-                  }
-                  setScreen("write-build");
-                }}
+                disabled={planName.trim().length === 0}
+                onPress={() => setScreen("write-build")}
               >
                 next
               </ActionText>
@@ -2274,6 +2883,7 @@ function Home() {
   const loggedSets = workoutSession.sets.length;
   const latestSteps = getStepsForDate(appState, today.date);
   const stepProgress = Math.min(latestSteps / today.stepGoal, 1);
+  const morningWeighIn = appState.morningWeighIn;
   const workoutComplete = hasCompletedWorkoutOnDate(
     appState,
     workoutPlan.id,
@@ -2390,6 +3000,16 @@ function Home() {
     }
   }, [onboardingHydrated, onboardingState]);
 
+  useEffect(() => {
+    const subscription = addMorningWeighInResponseListener(() =>
+      setSurfaceState("weighIn"),
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   const syncHealthSteps = () => {
     setHealthSyncStatus("syncing");
 
@@ -2457,6 +3077,11 @@ function Home() {
           markOnboardingNotificationsEnabled(state),
         );
       }
+    });
+
+    void scheduleMorningWeighInReminder({
+      wakeTime: morningWeighIn.wakeTime,
+      hasLoggedToday: hasWeighInForDate(appState, today.date),
     });
   };
   const syncNow = () => {
@@ -2751,6 +3376,34 @@ function Home() {
     setOnboardingReplayKey((key) => key + 1);
     setOnboardingState(resetOnboardingState());
   };
+  const logMorningWeighIn = (entry: WeighInEntry) => {
+    setAppState((state) => addWeighIn(state, entry));
+    void scheduleMorningWeighInReminder({
+      wakeTime: morningWeighIn.wakeTime,
+      hasLoggedToday: true,
+    });
+  };
+  const updateMorningUnit = (unit: WeightUnit) => {
+    setAppState((state) =>
+      updateMorningWeighInSettings(state, {
+        unit,
+      }),
+    );
+  };
+  const updateMorningEntryMethod = (entryMethod: WeighInEntryMethod) => {
+    setAppState((state) =>
+      updateMorningWeighInSettings(state, {
+        entryMethod,
+      }),
+    );
+  };
+  const updateMorningWakeTime = (wakeTime: string) => {
+    setAppState((state) =>
+      updateMorningWeighInSettings(state, {
+        wakeTime,
+      }),
+    );
+  };
 
   if (!hydrated || !onboardingHydrated) {
     return (
@@ -2808,6 +3461,9 @@ function Home() {
                   </ActionText>
                   <ActionText onPress={() => openWorkout("plans")}>
                     workouts
+                  </ActionText>
+                  <ActionText onPress={() => setSurfaceState("weighIn")}>
+                    weigh
                   </ActionText>
                   <ActionText onPress={() => setSurfaceState("settings")}>
                     settings
@@ -2889,9 +3545,15 @@ function Home() {
             authMessage={authMessage}
             authState={authState}
             healthSyncStatus={healthSyncStatus}
+            morningEntryMethod={morningWeighIn.entryMethod}
+            morningUnit={morningWeighIn.unit}
+            morningWakeTime={morningWeighIn.wakeTime}
             notificationsEnabled={notificationsEnabled}
             onBack={() => setSurfaceState("home")}
             onEnableNotifications={enableNotifications}
+            onSetMorningEntryMethod={updateMorningEntryMethod}
+            onSetMorningUnit={updateMorningUnit}
+            onSetMorningWakeTime={updateMorningWakeTime}
             onResetOnboarding={resetOnboarding}
             onSignIn={signIn}
             onSignOut={signOutOfAccount}
@@ -2899,6 +3561,14 @@ function Home() {
             supabaseConfigured={isSupabaseConfigured()}
             syncMessage={syncMessage}
             syncStatus={syncStatus}
+          />
+        ) : surfaceShown === "weighIn" ? (
+          <MorningWeighInSurface
+            entryMethod={morningWeighIn.entryMethod}
+            history={appState.weighIns}
+            onBack={() => setSurfaceState("home")}
+            onLog={logMorningWeighIn}
+            unit={morningWeighIn.unit}
           />
         ) : (
           <DaySurface
@@ -3009,7 +3679,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingBottom: 18,
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.screenTop,
+    paddingTop: 18,
   },
   onboardingContent: {
     backgroundColor: colors.background,
@@ -3237,6 +3907,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
   },
+  todayThreeTitleInner: {
+    alignSelf: "flex-start",
+  },
   todayThreeTitle: {
     color: colors.foreground,
     fontSize: typeScale.title,
@@ -3421,6 +4094,277 @@ const styles = StyleSheet.create({
   successText: {
     color: colors.success,
     opacity: opacity.title,
+  },
+  weighContent: {
+    flex: 1,
+    paddingBottom: 26,
+    paddingHorizontal: 28,
+    paddingTop: 60,
+  },
+  weighFlowHead: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 24,
+  },
+  weighBack: {
+    color: colors.foreground,
+    fontSize: 24,
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.enabled,
+  },
+  weighGreeting: {
+    marginTop: 14,
+    opacity: opacity.enabled,
+  },
+  weighStage: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  weightHeroRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+  },
+  weightHeroNumber: {
+    color: colors.foreground,
+    fontSize: 88,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "200",
+    letterSpacing: -3,
+    lineHeight: 92,
+    opacity: 0.96,
+  },
+  weightHeroNumberLogged: {
+    fontSize: 64,
+    letterSpacing: -2,
+    lineHeight: 68,
+  },
+  weightHeroUnit: {
+    color: colors.foreground,
+    fontSize: 22,
+    letterSpacing: 0,
+    lineHeight: 28,
+    opacity: opacity.metadata,
+  },
+  weighDelta: {
+    height: 19,
+    marginTop: 14,
+    textAlign: "center",
+  },
+  weighEnabledText: {
+    opacity: opacity.enabled,
+  },
+  weighControl: {
+    marginTop: 30,
+  },
+  dial: {
+    height: 96,
+    overflow: "hidden",
+    position: "relative",
+  },
+  dialTickWrap: {
+    alignItems: "center",
+    position: "absolute",
+    top: 30,
+    width: 1,
+  },
+  dialTick: {
+    backgroundColor: colors.foreground,
+    borderRadius: 1,
+    width: 1.5,
+  },
+  dialTickWhole: {
+    height: 34,
+    opacity: opacity.enabled,
+  },
+  dialTickHalf: {
+    height: 22,
+    opacity: opacity.metadata,
+  },
+  dialTickMinor: {
+    height: 14,
+    opacity: opacity.disabled,
+  },
+  dialLabel: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0,
+    lineHeight: 18,
+    marginTop: 6,
+    opacity: opacity.metadata,
+    transform: [{ translateX: -12 }],
+    width: 24,
+  },
+  dialNeedle: {
+    backgroundColor: colors.success,
+    borderRadius: 2,
+    height: 50,
+    position: "absolute",
+    top: 22,
+    transform: [{ translateX: -1.25 }],
+    width: 2.5,
+  },
+  dialNeedleDot: {
+    backgroundColor: colors.success,
+    borderRadius: 4,
+    height: 7,
+    position: "absolute",
+    top: 14,
+    transform: [{ translateX: -3.5 }],
+    width: 7,
+  },
+  dialFadeLeft: {
+    backgroundColor: colors.background,
+    bottom: 0,
+    left: 0,
+    opacity: 0.72,
+    position: "absolute",
+    top: 0,
+    width: 42,
+  },
+  dialFadeRight: {
+    backgroundColor: colors.background,
+    bottom: 0,
+    opacity: 0.72,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 42,
+  },
+  dialCaption: {
+    color: colors.foreground,
+    fontSize: typeScale.metadata,
+    letterSpacing: 0,
+    lineHeight: 19,
+    marginTop: 4,
+    opacity: opacity.disabled,
+    textAlign: "center",
+  },
+  keypad: {
+    columnGap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 2,
+  },
+  keypadKey: {
+    alignItems: "center",
+    height: 56,
+    justifyContent: "center",
+    width: "33.333%",
+  },
+  keypadText: {
+    color: colors.foreground,
+    fontSize: 28,
+    fontWeight: "300",
+    letterSpacing: 0,
+    lineHeight: 34,
+    opacity: opacity.body,
+  },
+  loggedStage: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  loggedConfirm: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 22,
+  },
+  loggedPulseLine: {
+    backgroundColor: colors.success,
+    borderRadius: 2,
+    height: 2,
+    opacity: 0.95,
+    width: 26,
+  },
+  loggedStats: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 30,
+  },
+  loggedStat: {
+    gap: 5,
+  },
+  loggedStatRight: {
+    alignItems: "flex-end",
+  },
+  loggedStatValue: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+  },
+  sparklineBlock: {
+    alignSelf: "center",
+    marginTop: 26,
+    width: 304,
+  },
+  sparklineCaptions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  weighHistoryTitle: {
+    gap: 6,
+    marginTop: 14,
+  },
+  weighHistoryList: {
+    gap: 15,
+    paddingBottom: 32,
+    paddingTop: 24,
+  },
+  weighHistoryRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 14,
+  },
+  weighHistoryMain: {
+    alignItems: "baseline",
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingBottom: 12,
+  },
+  weighHistoryValue: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 12,
+  },
+  weighHistoryReading: {
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: 15,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0,
+    lineHeight: 21,
+    opacity: opacity.body,
+  },
+  weighSingleAction: {
+    justifyContent: "flex-end",
+  },
+  settingsTimeInput: {
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    color: colors.foreground,
+    fontFamily: typography.mono,
+    fontSize: typeScale.body,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0,
+    lineHeight: 24,
+    opacity: opacity.body,
+    paddingHorizontal: 0,
+    paddingVertical: 8,
+    width: 88,
   },
   dayList: {
     gap: 24,
@@ -3772,11 +4716,11 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   addPlanFooter: {
-    color: colors.foreground,
+    color: "rgb(255, 255, 255)",
     fontSize: typeScale.metadata,
     letterSpacing: 0,
     lineHeight: 19,
-    opacity: opacity.disabled,
+    opacity: opacity.enabled,
   },
   addPlanNameInput: {
     borderBottomColor: "rgba(255,255,255,0.22)",

@@ -2,7 +2,7 @@ import type { WorkoutSession } from "../domain/workoutSession";
 import type { WorkoutPlan } from "../domain/workoutSession";
 import { createDefaultWorkoutPlan } from "./workoutPlan";
 
-export const CURRENT_APP_STATE_VERSION = 4;
+export const CURRENT_APP_STATE_VERSION = 5;
 
 export type DailyOutcome = {
   date: string;
@@ -70,6 +70,21 @@ export type StepSample = {
   source: "health";
 };
 
+export type WeightUnit = "kg" | "lb";
+
+export type WeighInEntryMethod = "dial" | "keypad";
+
+export type WeighInEntry = {
+  t: number;
+  kg: number;
+};
+
+export type MorningWeighInSettings = {
+  unit: WeightUnit;
+  entryMethod: WeighInEntryMethod;
+  wakeTime: string;
+};
+
 export type AppState = {
   version: typeof CURRENT_APP_STATE_VERSION;
   dailyOutcomes: DailyOutcome[];
@@ -82,6 +97,8 @@ export type AppState = {
   workoutPlans: ManagedWorkoutPlan[];
   dailyPlans: DailyPlan[];
   dailyItems: DailyItem[];
+  weighIns: WeighInEntry[];
+  morningWeighIn: MorningWeighInSettings;
 };
 
 export function createInitialAppState(): AppState {
@@ -99,6 +116,12 @@ export function createInitialAppState(): AppState {
     workoutPlans: [createManagedWorkoutPlan(workoutPlan, 0)],
     dailyPlans: [],
     dailyItems: [],
+    weighIns: [],
+    morningWeighIn: {
+      unit: "lb",
+      entryMethod: "dial",
+      wakeTime: "06:30",
+    },
   };
 }
 
@@ -316,6 +339,39 @@ export function addStepSample(state: AppState, sample: StepSample): AppState {
       ),
     ].sort((a, b) => b.capturedAt - a.capturedAt),
   };
+}
+
+export function addWeighIn(state: AppState, entry: WeighInEntry): AppState {
+  const date = formatDateKey(new Date(entry.t));
+
+  return {
+    ...state,
+    weighIns: [
+      entry,
+      ...state.weighIns.filter(
+        (stored) => formatDateKey(new Date(stored.t)) !== date,
+      ),
+    ].sort((a, b) => a.t - b.t),
+  };
+}
+
+export function updateMorningWeighInSettings(
+  state: AppState,
+  patch: Partial<MorningWeighInSettings>,
+): AppState {
+  return {
+    ...state,
+    morningWeighIn: {
+      ...state.morningWeighIn,
+      ...patch,
+    },
+  };
+}
+
+export function hasWeighInForDate(state: AppState, date: string) {
+  return state.weighIns.some(
+    (entry) => formatDateKey(new Date(entry.t)) === date,
+  );
 }
 
 export function getStepsForDate(state: AppState, date: string) {
